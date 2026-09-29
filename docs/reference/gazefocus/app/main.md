@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@a0e7f5a · 2026-09-29
+Verified against: GazeFocus@cb0c306 · 2026-09-29
 
 `run_app()`:
 1. DPI awareness.
@@ -15,7 +15,12 @@ Verified against: GazeFocus@a0e7f5a · 2026-09-29
 - `MessageWindow` carrying `InputWatcher` (Raw Input), `Hotkey` (Ctrl+Alt+G → `toggle_pause`) and `SystemEvents` (lock, unlock, suspend, resume, display change → re-layout after 1.5 s).
 - `ForegroundHook` → `MruTracker` (targets only in the lists; everything else counts as manual).
 - `CameraWorker` → `_on_sample` → `Controller.on_sample`, only while `state.switching`.
-- `Tray`: status, Pause, Recalibrate (a `CalibrationJob` with beeps, then `commit_calibration`, then `refresh_layout`), config, logs, Quit.
+- `Tray`: status, Pause, Recalibrate, config, logs, Quit.
+
+**Recalibrate** (a `CalibrationJob` with beeps, then `commit_calibration`, then `refresh_layout`) has three guards, all final-review fixes:
+- It's refused unless exactly 2 monitors are present (a tray notification). Otherwise a one-monitor file would replace the good one.
+- It records the layout fingerprint at the start. If the layout differs at the end, the result isn't saved and the previous calibration is kept.
+- Pause, lock and sleep (`_set(flag, True)`) cancel a running job, which releases the camera; you get "Calibration cancelled" and nothing is saved.
 
 **`refresh_layout()`:**
 - Exactly 2 monitors are required, otherwise "unsupported".
@@ -23,7 +28,9 @@ Verified against: GazeFocus@a0e7f5a · 2026-09-29
 - Both zones must map to present devices.
 - A fresh `Controller` is then built.
 
-**`apply()`:** the camera runs iff `state.camera_wanted` and no retry or restart timer is pending.
+**`apply()`:** the camera runs iff `state.camera_wanted` and no retry or restart timer is pending. If a stopped run still holds the camera, `worker.start()` is refused and the next `tick` retries.
+
+**`close()`:** cancels any calibration job, then stops the camera, waiting up to 3 s.
 
 **`tick()` (1 Hz):**
 - polls the config (a live reload rebuilds the controller and re-registers the hotkey)

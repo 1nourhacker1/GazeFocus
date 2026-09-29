@@ -1,7 +1,7 @@
 # GazeFocus: design spec
 
-> Status: **design, approved section by section in brainstorming on 2026-09-29. Awaiting review of this written spec.**
-> Nothing here is code-verified yet. There is no source code.
+> Status: **design, approved section by section in brainstorming on 2026-09-29; the written spec was approved the same day.**
+> Implemented through Plan 2: §4, §6, §7 and §10–12 in `src/gazefocus/`, with the per-file docs under `docs/reference/gazefocus/`. Desk acceptance is pending. §8 and §9 (the dock and overlay) are Plan 3.
 > Mockups: `docs/superpowers/mockups/` (the dock, calibration, and the earlier style options).
 
 ## 1. Intent
@@ -106,6 +106,7 @@ focus is.
 ### 4.5 Pause
 - Toggled by clicking the dock, the tray menu, or **Ctrl+Alt+G** (`RegisterHotKey`, no hook).
 - Pausing **releases the camera** (the light turns off). Resuming reopens it.
+- Pausing, locking or sleeping during a calibration **cancels it**. That releases the camera and keeps the previous calibration (Plan 2 final review).
 
 ## 5. Architecture
 
@@ -318,6 +319,10 @@ class Decision:
    - the separation score and meter (§6.2)
    - **Save** and **Redo**
 7. **Esc** cancels at any point. Raw Input sees the key; nothing captures it.
+8. **Both monitors must be connected.**
+   - The app refuses Recalibrate with anything other than 2 monitors.
+   - It doesn't save a result if the layout changed during the run, so the good calibration can't be replaced by a one-monitor one.
+   - `calibrate-cli` still allows one monitor, for dry-run use (Plan 1).
 
 ## 10. Configuration and files (`%APPDATA%\GazeFocus\`)
 
@@ -462,3 +467,4 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Calibration cues | The program beeps (450 ms): 1 = LG, 2 = laptop, 3 = done | Typed cues from the assistant (arrived seconds late) |
 | Camera hand-over for calls (Plan 2) | Manual pause (Ctrl+Alt+G / tray) | Auto-yield to call apps; Windows multi-app camera setting |
 | Focus after using the tray menu (Plan 2) | Return focus to the last app window | Leave it on the taskbar |
+| Recalibrate without both monitors (Plan 2 final review) | Refused in the app; a mid-run layout change isn't saved | Save a one-monitor calibration over the good one |
