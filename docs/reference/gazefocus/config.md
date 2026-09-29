@@ -1,5 +1,5 @@
 # gazefocus/config.py
-Verified against: GazeFocus@90c2edd · 2026-09-29
+Verified against: GazeFocus@bf7feda · 2026-09-29
 
 The file is `%APPDATA%\GazeFocus\config.toml`; the CLI writes the defaults on first run via `write_default_config`.
 
@@ -14,3 +14,4 @@ The file is `%APPDATA%\GazeFocus\config.toml`; the CLI writes the defaults on fi
 - `load_config` **never raises on bad content**. Invalid TOML gives all defaults and one warning. A bad value gives that key's default and a warning. Unknown sections and keys produce warnings and are ignored.
 - Integer values given for float keys are converted to float.
 - `ConfigWatcher.poll()` reloads when the file's mtime or size changes, including deletion (which reverts to the defaults).
+- An unreadable file (OSError) gives all defaults plus one warning.

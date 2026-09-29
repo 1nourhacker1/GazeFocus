@@ -1,5 +1,5 @@
 # gazefocus/win/camera_usage.py
-Verified against: GazeFocus@ebc532b · 2026-09-29
+Verified against: GazeFocus@bf7feda · 2026-09-29
 
 Reads `HKCU\…\CapabilityAccessManager\ConsentStore\webcam`.
 - Packaged apps are direct subkeys. Classic apps are under `NonPackaged`, with `#` standing in for `\`.
@@ -7,3 +7,4 @@ Reads `HKCU\…\CapabilityAccessManager\ConsentStore\webcam`.
 - **Only a hint.** Records go stale when an app crashes, so it's consulted only after `CameraSource.open()` fails, and the message says "Possibly".
 - `exclude=` drops our own interpreter paths, so a stale record from our own crash isn't reported.
 - M0-D results: `docs/spikes/m0d-camera-sharing.md`.
+- Unreadable subkeys are skipped. The 'nobody reported' message suggests another GazeFocus command may hold the camera.

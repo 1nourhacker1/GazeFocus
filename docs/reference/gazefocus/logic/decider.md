@@ -1,5 +1,5 @@
 # gazefocus/logic/decider.py
-Verified against: GazeFocus@a653369 · 2026-09-29
+Verified against: GazeFocus@bf7feda · 2026-09-29
 
 A pure state machine. The caller builds a `Context` every frame from the **live** world: the foreground window's zone, last key time, mouse buttons, last manual focus change, fullscreen, paused, ready.
 
@@ -12,3 +12,4 @@ A pure state machine. The caller builds a `Context` every frame from the **live*
 6. Otherwise return `switch / "dwell met"` with `target=zone`, and mark it pending.
 
 The caller must answer every `switch` with `notify_switched(t)` or `notify_switch_failed(t)`.
+- `reason_category` strips numbers from blocked reasons. `notify_switch_failed` latches the **pending target**, not the current candidate, because the gaze may move while an asynchronous switch is in flight.
