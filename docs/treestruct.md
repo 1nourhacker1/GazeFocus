@@ -49,3 +49,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [M0-B: focus switch (pending)](spikes/m0b-focus-switch.md)
 - [gazefocus/win/rawinput.py](reference/gazefocus/win/rawinput.md)
 - [gazefocus/win/foreground.py](reference/gazefocus/win/foreground.md)
+- [gazefocus/win/system.py](reference/gazefocus/win/system.md)
