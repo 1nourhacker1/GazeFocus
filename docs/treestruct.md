@@ -9,7 +9,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 |---|---|---|
 | `superpowers/specs/` | **Design, not code-verified.** No source exists yet. | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
-| `reference/gazefocus/` | Mirror docs, one per source file; each carries its own `Verified against` sha | per file |
+| `reference/gazefocus/` | Code-verified per file (see each `Verified against`) | per file |
 | `spikes/` | Hardware spike results, pasted from real runs | per file |
 
 ## Contents
@@ -41,3 +41,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/replay.py](reference/gazefocus/replay.md)
 - [gazefocus/runtime.py](reference/gazefocus/runtime.md)
 - [gazefocus/__main__.py](reference/gazefocus/__main__.md)
+- [Plan 1 desk session](spikes/plan1-desk-session.md)
