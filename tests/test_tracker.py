@@ -46,3 +46,8 @@ def test_detect_returns_the_raw_result():
     finally:
         tracker.close()
     assert raw.face_landmarks == [] and raw.facial_transformation_matrixes == []
+
+
+def test_missing_model_says_how_to_fetch_it(tmp_path):
+    with pytest.raises(FileNotFoundError, match="fetch_model.py"):
+        HeadTracker(tmp_path / "nope.task")

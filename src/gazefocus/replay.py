@@ -9,7 +9,7 @@ from typing import Iterable, Iterator
 
 from gazefocus.config import Config
 from gazefocus.logic.classifier import ZoneClassifier, ZoneModel
-from gazefocus.logic.decider import Context, GazeDecider
+from gazefocus.logic.decider import Context, GazeDecider, reason_category
 from gazefocus.types import Decision, HeadSample, Zone
 
 
@@ -76,10 +76,6 @@ def replay(frames: Iterable[tuple[HeadSample, Context]], model: ZoneModel, cfg: 
     return out
 
 
-def _category(reason: str) -> str:
-    return reason.rstrip("0123456789.s ")  # "typing 0.3s" -> "typing"
-
-
 def summarize(decisions: Iterable[Decision]) -> list[str]:
     lines, run = [], None
     for d in decisions:
@@ -88,9 +84,9 @@ def summarize(decisions: Iterable[Decision]) -> list[str]:
             lines.append(f"{d.t:8.2f}s  SWITCH  -> {d.target.value}  (margin {margin})")
             run = None
         elif d.action == "blocked":
-            if _category(d.reason) != run:
+            if reason_category(d.reason) != run:
                 lines.append(f"{d.t:8.2f}s  blocked -> {d.target.value}: {d.reason}")
-                run = _category(d.reason)
+                run = reason_category(d.reason)
         else:
             run = None
     return lines

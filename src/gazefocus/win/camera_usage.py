@@ -50,13 +50,19 @@ def read_consent_store() -> list[Entry]:
     entries: list[Entry] = []
     with base:
         for name in _subkeys(base):
-            with winreg.OpenKey(base, name) as key:
-                if name == "NonPackaged":
-                    for exe in _subkeys(key):
-                        with winreg.OpenKey(key, exe) as sub:
-                            entries.append((exe.replace("#", "\\"), False, _values(sub)))
-                else:
-                    entries.append((name, True, _values(key)))
+            try:
+                with winreg.OpenKey(base, name) as key:
+                    if name == "NonPackaged":
+                        for exe in _subkeys(key):
+                            try:
+                                with winreg.OpenKey(key, exe) as sub:
+                                    entries.append((exe.replace("#", "\\"), False, _values(sub)))
+                            except OSError:
+                                continue
+                    else:
+                        entries.append((name, True, _values(key)))
+            except OSError:
+                continue  # one unreadable entry must not break the busy-camera message
     return entries
 
 
@@ -82,7 +88,8 @@ def camera_busy_message(users: list[CameraUser] | None = None, exclude: Iterable
     if not users:
         return (
             "Could not open the camera, and Windows reports no other app using it. "
-            "Check Settings > Privacy & security > Camera."
+            "Is another GazeFocus command (e.g. `gazefocus run`) holding it? "
+            "Otherwise check Settings > Privacy & security > Camera."
         )
     names = ", ".join(_short(u) for u in users)
     return (

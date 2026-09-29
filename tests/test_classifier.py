@@ -186,3 +186,12 @@ def test_face_loss_right_after_a_past_the_lg_turn_latches_lg():
         c.update(HeadSample(t=i / 15, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8))
     zone, m = c.update(s(5 / 15 + 0.1))
     assert zone is Zone.LG and m is not None and m <= -1.2
+
+
+def test_non_finite_features_are_ignored_not_fed_to_the_ema():
+    """Plan 1 review: one NaN would have poisoned the EMA until the next face loss."""
+    c = ZoneClassifier(TOY, ClassifierCfg())
+    c.update(s(0.0, 0))
+    assert c.update(HeadSample(0.1, True, yaw=float("nan"), pitch=10.0)) == (Zone.UNKNOWN, None)
+    zone, m = c.update(s(0.2, 0))
+    assert zone is Zone.LAPTOP and m == pytest.approx(1.0)

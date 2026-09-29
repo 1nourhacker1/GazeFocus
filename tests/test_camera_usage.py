@@ -46,3 +46,24 @@ def test_message_when_nobody_reported():
 def test_real_registry_read_is_well_formed():
     for app, packaged, values in read_consent_store():
         assert isinstance(app, str) and isinstance(packaged, bool) and isinstance(values, dict)
+
+
+def test_message_mentions_another_gazefocus_when_nobody_is_reported():
+    assert "GazeFocus" in camera_busy_message([])
+
+
+def test_unreadable_subkey_is_skipped(monkeypatch):
+    import winreg
+
+    from gazefocus.win import camera_usage
+
+    real_open = winreg.OpenKey
+
+    def flaky_open(key, sub, *a, **k):
+        if sub == "NonPackaged":
+            raise PermissionError("access denied")
+        return real_open(key, sub, *a, **k)
+
+    monkeypatch.setattr(camera_usage.winreg, "OpenKey", flaky_open)
+    entries = camera_usage.read_consent_store()  # must not raise
+    assert all(packaged for _, packaged, _ in entries)

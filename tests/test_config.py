@@ -64,3 +64,11 @@ def test_watcher_reloads_on_change_and_delete(tmp_path):
     assert w.poll() is True and seen == [800]
     p.unlink()
     assert w.poll() is True and seen == [800, 500]
+
+
+def test_unreadable_config_gives_defaults(tmp_path):
+    """Plan 1 review: an editor's delete-and-rename save can make the file briefly unreadable."""
+    folder = tmp_path / "config.toml"
+    folder.mkdir()  # reading a directory raises OSError
+    cfg, warns = load_config(folder)
+    assert cfg == Config() and len(warns) == 1 and "could not read" in warns[0]

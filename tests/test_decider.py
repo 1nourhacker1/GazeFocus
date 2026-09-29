@@ -118,3 +118,23 @@ def test_failed_switch_needs_look_away():
 def test_unknown_focus_counts_as_elsewhere():
     out = feed(GazeDecider(), LAPTOP, frames(0.0, 1.0), focus=UNKNOWN)
     assert first(out, "switch").target is LAPTOP
+
+
+def test_failure_latches_the_pending_target_even_if_gaze_moved_meanwhile():
+    """Plan 1 review: notify_switch_failed latched the *current* candidate, which is None if the
+    gaze wandered to UNKNOWN while the (asynchronous) switch was still pending."""
+    dec = GazeDecider()
+    sw = first(feed(dec, LG, frames(0.0, 0.6)), "switch")
+    feed(dec, UNKNOWN, [0.65])  # gaze wanders while the switch is in flight
+    dec.notify_switch_failed(0.7)
+    out = feed(dec, LG, frames(0.75, 1.6))
+    assert sw.target is LG
+    assert first(out, "switch") is None
+    assert first(out, "blocked").reason == "switch failed; look away to retry"
+
+
+def test_reason_category_ignores_numbers():
+    from gazefocus.logic.decider import reason_category
+
+    assert reason_category("typing 0.3s") == reason_category("typing 1.2s") == "typing"
+    assert reason_category("manual focus cooldown") == "manual focus cooldown"

@@ -103,7 +103,11 @@ def load_config(path: Path) -> tuple[Config, list[str]]:
     if not path.exists():
         return Config(), []
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+    except OSError as e:
+        return Config(), [f"could not read config.toml ({e}); using all defaults"]
+    try:
+        data = tomllib.loads(text)
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
         return Config(), [f"config.toml is not valid TOML ({e}); using all defaults"]
     cfg, warns = Config(), []

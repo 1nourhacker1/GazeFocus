@@ -10,6 +10,11 @@ from gazefocus.types import Decision, Zone
 _KNOWN = (Zone.LG, Zone.LAPTOP)
 
 
+def reason_category(reason: str) -> str:
+    """'typing 0.3s' -> 'typing': blocked reasons without their numbers (log/summary dedupe)."""
+    return reason.rstrip("0123456789.s ")
+
+
 @dataclass(frozen=True)
 class Context:
     t: float
@@ -29,6 +34,7 @@ class GazeDecider:
         self._since = 0.0
         self._last_switch_t: float | None = None
         self._pending = False
+        self._pending_target: Zone | None = None
         self._failed_zone: Zone | None = None
 
     def step(self, zone: Zone, margin: float | None, ctx: Context) -> Decision:
@@ -57,7 +63,7 @@ class GazeDecider:
         reason = self._freeze_reason(ctx)
         if reason is not None:
             return decide("blocked", reason, zone)
-        self._pending = True
+        self._pending, self._pending_target = True, zone
         return decide("switch", "dwell met", zone)
 
     def _freeze_reason(self, ctx: Context) -> str | None:
@@ -79,7 +85,9 @@ class GazeDecider:
         return None
 
     def notify_switched(self, t: float) -> None:
-        self._pending, self._last_switch_t, self._cand = False, t, None
+        self._pending, self._pending_target, self._last_switch_t, self._cand = False, None, t, None
 
     def notify_switch_failed(self, t: float) -> None:
-        self._pending, self._failed_zone, self._cand = False, self._cand, None
+        # latch the zone we tried to switch to: the gaze may have moved while the switch was pending
+        self._pending, self._failed_zone, self._cand = False, self._pending_target or self._cand, None
+        self._pending_target = None

@@ -33,6 +33,10 @@ class HeadTracker:
         from mediapipe.tasks import python as mp_tasks
         from mediapipe.tasks.python import vision as mp_vision
 
+        if not Path(model_path).is_file():
+            raise FileNotFoundError(
+                f"face model not found at {model_path}; run: uv run python scripts/fetch_model.py"
+            )
         self._mp = mp
         options = mp_vision.FaceLandmarkerOptions(
             base_options=mp_tasks.BaseOptions(model_asset_path=str(model_path)),

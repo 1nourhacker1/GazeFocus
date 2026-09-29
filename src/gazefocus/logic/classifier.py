@@ -151,7 +151,7 @@ class ZoneClassifier:
         if s.face:
             f = features(s)
             self._lost, self._latched_lg = False, False
-            if self.model.is_outlier(f, self.cfg.ood_sigma):
+            if not np.all(np.isfinite(f)) or self.model.is_outlier(f, self.cfg.ood_sigma):
                 self._restart = True  # after looking at neither screen, start the EMA fresh
                 return Zone.UNKNOWN, None  # keep it out of the EMA and out of the face-lost memory
             z = self.model.z(f)
