@@ -193,6 +193,74 @@ def cmd_replay(args) -> int:
     return EXIT_OK
 
 
+def configure_console() -> None:
+    """Window titles can hold characters the console code page lacks (e.g. cp1252 and '\u25d0')."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+def _diag_zone_devices() -> tuple[dict, str]:
+    """{zone: device} from a matching calibration, else primary = LAPTOP and the other = LG."""
+    from gazefocus.storage import calibration_path, load_if_matches
+    from gazefocus.win.monitors import enumerate_monitors, layout_fingerprint
+
+    monitors = enumerate_monitors()
+    cal, _ = load_if_matches(calibration_path(), layout_fingerprint(monitors))
+    if cal is not None:
+        by_id = {m.id: m.device for m in monitors}
+        return {z: by_id.get(i) for z, i in cal.zone_monitors.items()}, "calibration"
+    primary = next((m.device for m in monitors if m.primary), None)
+    others = [m.device for m in monitors if not m.primary]
+    return {"LAPTOP": primary, "LG": others[0] if len(others) == 1 else None}, "primary/other guess"
+
+
+def cmd_diag(args) -> int:
+    import time as _time
+
+    from gazefocus.win import windows
+    from gazefocus.win.focus import bring_to_front
+    from gazefocus.win.monitors import enumerate_monitors, layout_fingerprint
+
+    if args.what == "monitors":
+        monitors = enumerate_monitors()
+        for m in monitors:
+            print(f"{m.device}  primary={m.primary}  rect={m.rect}  work={m.work}\n    id={m.id}")
+        zones, source = _diag_zone_devices()
+        print(f"fingerprint {layout_fingerprint(monitors)}   zones ({source}): {zones}")
+        return EXIT_OK
+    if args.what == "windows":
+        by_device: dict = {}
+        for hwnd in windows.top_level_windows():
+            f = windows.window_facts(hwnd)
+            ok, reason = windows.is_switch_target(f)
+            if ok or args.all:
+                by_device.setdefault(f.device, []).append((f, reason))
+        for device, items in by_device.items():
+            print(f"{device}:")
+            for f, reason in items:
+                print(f"  {f.hwnd:>10}  {reason:<16} {f.class_name[:28]:<28} {f.title[:60]}")
+        return EXIT_OK
+    zones, source = _diag_zone_devices()
+    device = zones.get(args.zone)
+    if device is None:
+        print(f"{args.zone} is not connected (zones from {source}: {zones})")
+        return EXIT_BAD_INPUT
+    if args.delay > 0:
+        print(f"switching to {args.zone} ({device}) in {args.delay:.0f} s: click a window on the OTHER screen now")
+        _time.sleep(args.delay)
+    hwnd = windows.choose_target(device, [], windows.window_facts, windows.top_level_windows)
+    if hwnd is None:
+        print(f"no window to focus on {args.zone}")
+        return EXIT_BAD_INPUT
+    title = windows.window_facts(hwnd).title
+    result = bring_to_front(hwnd)
+    print(f"{'OK' if result.ok else 'FAILED'}: {title!r} via {result.method} in {result.ms:.0f} ms {result.detail}")
+    return EXIT_OK if result.ok else EXIT_BAD_INPUT
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="gazefocus", description="Webcam focus-follows-gaze (Plan 1: terminal tools, dry run).")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -212,6 +280,16 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("replay", help="run a recording through the classifier and decider")
     r.add_argument("file")
     r.set_defaults(fn=cmd_replay)
+    d = sub.add_parser("diag", help="check the Windows side: monitors, windows, a focus switch")
+    dsub = d.add_subparsers(dest="what", required=True)
+    dsub.add_parser("monitors", help="monitor layout, ids, fingerprint and zone mapping")
+    dw = dsub.add_parser("windows", help="focus targets per monitor, in Z-order")
+    dw.add_argument("--all", action="store_true", help="also list rejected windows with the reason")
+    df = dsub.add_parser("focus", help="focus the top window on a screen (spike M0-B)")
+    df.add_argument("zone", choices=("LAPTOP", "LG"))
+    df.add_argument("--delay", type=float, default=3.0, help="seconds to click elsewhere first")
+    d.set_defaults(fn=cmd_diag)
+    configure_console()
     args = p.parse_args(argv)
     return args.fn(args)
 

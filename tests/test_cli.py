@@ -19,7 +19,7 @@ def test_help_lists_commands(capsys):
         main(["--help"])
     assert e.value.code == 0
     out = capsys.readouterr().out
-    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live"):
+    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live", "diag"):
         assert cmd in out
 
 
@@ -109,3 +109,34 @@ def test_good_calibration_is_saved(monkeypatch):
     fake_calibration_run(monkeypatch, GOOD)
     assert main(["calibrate-cli"]) == 0
     assert '"separation": 12.0' in calibration_path().read_text(encoding="utf-8")
+
+
+# --- Plan 2: diag ---
+import io
+import sys
+
+from gazefocus.win import windows as win_windows
+from gazefocus.win.windows import WindowFacts
+
+
+def test_diag_monitors_prints_the_layout(capsys):
+    assert main(["diag", "monitors"]) == 0
+    out = capsys.readouterr().out
+    assert "fingerprint" in out and "DISPLAY" in out
+
+
+def test_diag_windows_survives_unicode_titles_on_a_cp1252_console(monkeypatch):  # Review Focus #5
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    monkeypatch.setattr(win_windows, "top_level_windows", lambda: [77])
+    monkeypatch.setattr(win_windows, "window_facts", lambda h, own_pid=None: WindowFacts(
+        77, True, visible=True, class_name="CASCADIA_HOSTING_WINDOW_CLASS", title="◐ Eye tracking", device=r"\\.\DISPLAY1"))
+    assert main(["diag", "windows"]) == 0
+    sys.stdout.flush()
+    assert b"Eye tracking" in raw.getvalue()
+
+
+def test_diag_focus_with_no_window_on_that_screen(monkeypatch, capsys):
+    monkeypatch.setattr(win_windows, "choose_target", lambda *a, **k: None)
+    assert main(["diag", "focus", "LG", "--delay", "0"]) == 1
+    assert "no window" in capsys.readouterr().out
