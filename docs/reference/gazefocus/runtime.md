@@ -1,10 +1,10 @@
 # gazefocus/runtime.py
-Verified against: GazeFocus@fc2462b · 2026-09-29
+Verified against: GazeFocus@90c2edd · 2026-09-29
 
 Camera-driven loops used by the CLI. Every loop takes `read_frame`, `track`, `clock`, `sleep` and `say`, so the tests run on a fake clock. The default clock is `time.perf_counter` (`time.monotonic` ticks every 15.6 ms on Windows).
 
 - `Pacer(fps)` sleeps to the next frame slot. If it falls behind it drops the missed slots instead of catching up.
-- `collect_phase` discards the first `settle_s` (0.4 s, while the eyes settle) and returns the samples.
+- `collect_phase` discards the first `settle_s` (**1.0 s**; the desk session showed a head turn between screens takes about 1 s) and returns the samples.
 - `calibrate`:
   1. Runs the prompts `LG` then `LAPTOP`, 6 s each, with a 2 s lead-in.
   2. Requires **at least 40 face samples** per screen, otherwise `ValueError` ("too few face samples… too dark?").
