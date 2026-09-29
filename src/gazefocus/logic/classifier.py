@@ -21,6 +21,9 @@ MIN_SAMPLES = 5
 VAR_FLOOR = np.array([1.0, 1.0, 0.05**2])
 TRIM_MADS = 3.0  # calibration frames farther than this from the screen's median yaw are turn frames
 _OOD_FEATURES = (1, 2)  # pitch and iris_h; yaw beyond either screen still points at that side
+# Minimum spread for the outlier gate only: normal reading moves pitch a few degrees and the eyes a little,
+# even when calibration was steady (desk session: pitch sd hit the 1 deg variance floor).
+OOD_SD_FLOOR = np.array([0.0, 4.0, 0.15])
 
 
 def features(s: HeadSample) -> np.ndarray:
@@ -43,7 +46,7 @@ class ZoneModel:
 
     def is_outlier(self, f, sigma: float) -> bool:
         """True when pitch or iris_h is more than `sigma` sd from BOTH screens (e.g. looking at a phone)."""
-        f, sd = np.asarray(f, dtype=float), np.asarray(self.sd)
+        f, sd = np.asarray(f, dtype=float), np.maximum(np.asarray(self.sd), OOD_SD_FLOOR)
         idx = list(_OOD_FEATURES)
         far = [np.max(np.abs(f[idx] - np.asarray(mean)[idx]) / sd[idx]) for mean in (self.mean_lg, self.mean_laptop)]
         return min(far) > sigma

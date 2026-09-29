@@ -148,3 +148,13 @@ def test_face_lost_after_a_long_gap_is_unknown():
     c = ZoneClassifier(TOY, ClassifierCfg())
     c.update(s(0.0, -45))
     assert c.update(s(0.5)) == (Zone.UNKNOWN, None)  # 0.5 s > face_lost_memory_s (0.3)
+
+
+def test_outlier_gate_has_a_realistic_minimum_spread():
+    """Desk session: a steady calibration gave pitch sd = 1.0 (the variance floor), so reading the
+    bottom edge of the laptop (a few degrees lower) was flagged as 'neither screen'."""
+    tight = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=15.0, mean_lg=(-30, 1, 0), mean_laptop=(0, 7, 0),
+                      sd=(2.0, 1.0, 0.05))
+    assert not tight.is_outlier([0.0, 7 + 8.0, 0.0], 3.5)  # 8 deg below the laptop mean: still the laptop
+    assert not tight.is_outlier([0.0, 7.0, 0.3], 3.5)  # eyes a little to the side
+    assert tight.is_outlier([0.0, 7 + 21.0, 0.0], 3.5)  # leaning down to a phone
