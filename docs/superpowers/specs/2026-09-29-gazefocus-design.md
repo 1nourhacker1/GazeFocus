@@ -139,6 +139,11 @@ A single Python 3.12 process (uv-managed) with two threads:
 | `ui.tray` | Tray icon menu | PySide6 | no |
 | `config`, `storage`, `replay`, `diag` | §10, §12 | tomllib, json | mostly |
 
+> *(Plan 2, 2026-09-29)*
+> - The app lives in `gazefocus.app`: `state`, `decision_log`, `controller` (with an injectable `Desktop` for all Win32 access, so behaviour is tested with fakes), `workers`, `tray` and `main`.
+> - The Windows side is in `gazefocus.win`: `_api` (every prototype, declared once), `msgwindow` (a hidden **top-level** window, not message-only, so it also gets broadcasts; Qt's loop pumps it), `windows`, `focus`, `rawinput`, `foreground` and `system`.
+> - Shared helpers: `calibration.commit_calibration` (used by the CLI and the tray) and `cues.beep`.
+
 **Core types** (`gazefocus/types.py`):
 ```python
 @dataclass(frozen=True)
@@ -194,6 +199,7 @@ class Decision:
 - A hidden message-only window registers keyboard and mouse with `RIDEV_INPUTSINK`.
 - Events arrive as copies after delivery, so they can't add latency.
 - Injected events are ignored (`hDevice == NULL`), so our own `SendInput` never counts as the user touching the mouse.
+- *(Plan 2)* Mouse buttons *held* are read live with `GetAsyncKeyState` every frame, never cached from Raw Input, so a missed button-up can't freeze switching. The window receiving Raw Input is a hidden top-level window (see §5), not a message-only one.
 
 ### 7.2 Foreground tracking
 - `SetWinEventHook(EVENT_SYSTEM_FOREGROUND, …, WINEVENT_OUTOFCONTEXT)` on the Qt thread.
@@ -221,6 +227,7 @@ class Decision:
   - The webcam is **exclusive**. The Windows Camera app fails while GazeFocus holds it.
   - A failed attempt by another app leaves **no** ConsentStore trace, so this check only covers the reverse case.
   - Plan 2 must hand the camera over explicitly: the manual pause, and possibly a call-app heuristic. See `docs/spikes/m0d-camera-sharing.md`.
+  **Decision (2026-09-29):** camera hand-over is **manual only**. Ctrl+Alt+G or tray → Pause releases the camera. The user declined auto-yielding to call apps, and declined Windows' "allow multiple apps to use the camera" setting.
 - **Single instance:** named mutex `Local\GazeFocus`. A second launch exits.
 
 ## 8. The dock
@@ -387,6 +394,7 @@ class Decision:
 - `--replay FILE` runs a recording through the classifier and decider and prints the decisions, so tuning can be tested
   against real behaviour.
 - `gazefocus diag monitors | windows | focus <monitor> | camera` checks each Windows piece by hand.
+  *(Plan 2)* Implemented as `gazefocus diag monitors | windows [--all] | focus {LAPTOP,LG} [--delay 3]`; `gazefocus live` serves as `diag camera`.
 
 ### 12.4 Acceptance checklist (on the desk; **the LG must be reconnected**)
 1. Look at the LG while idle → focus moves within about 0.6 s, and the cursor warps if the mouse is idle.
@@ -452,3 +460,5 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Classifier (desk session, after Plan 1) | Diagonal discriminant on yaw, pitch, iris_h; turn-frame trim; outlier gate; v2 calibration file | Full-covariance LDA on four features (weighted pitch against its own mean difference on real data) |
 | Live view (user request) | `gazefocus live`, a mirrored preview with the head-pose overlay | none |
 | Calibration cues | The program beeps (450 ms): 1 = LG, 2 = laptop, 3 = done | Typed cues from the assistant (arrived seconds late) |
+| Camera hand-over for calls (Plan 2) | Manual pause (Ctrl+Alt+G / tray) | Auto-yield to call apps; Windows multi-app camera setting |
+| Focus after using the tray menu (Plan 2) | Return focus to the last app window | Leave it on the taskbar |

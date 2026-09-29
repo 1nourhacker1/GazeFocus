@@ -2,8 +2,13 @@
 
 Webcam "focus follows gaze" for a two-monitor Windows desk. Look at a screen, and keyboard focus goes to the last window you used there. A Liquid Glass status dock sits under the laptop camera.
 
-**Status: Plan 1 of 3.** These are terminal tools and a **dry run**: GazeFocus shows what it *would* do and focuses nothing yet.
-Plan 2 adds the real focus switch; Plan 3 adds the dock and the calibration overlay.
+**Status: Plan 2 of 3.** `gazefocus run` is the real app: focus follows your gaze. Plan 3 adds the Liquid Glass dock and the calibration overlay.
+
+## Using it
+- Start it with `uv run gazefocus run`. A two-tile icon appears in the tray (possibly under the ^ overflow arrow).
+- **Before a video call, press Ctrl+Alt+G** (or tray → Pause). This webcam can't be shared, so pausing releases it. Press it again afterwards.
+- **Recalibrate** is in the tray. Listen for the beeps: 1 = look at the LG, 2 = the laptop, 3 = done.
+- Logs are in `%APPDATA%\GazeFocus\logs`. `decisions.log` has one line per switch or block.
 
 ## Setup
 ```bash
@@ -15,6 +20,8 @@ uv run pytest
 ## Commands
 | Command | What it does |
 |---|---|
+| `uv run gazefocus run` | The background app: tray icon, real focus switching; Ctrl+Alt+G pauses and releases the camera |
+| `uv run gazefocus diag monitors \| windows \| focus LG` | Check the Windows side: the layout, focus targets per screen, a single focus switch |
 | `uv run gazefocus probe` | Guided measurement of tracking range, yaw sign and speed (spike M0-A) |
 | `uv run gazefocus live` | Live mirrored camera window: face box, eye points, head-direction arrow, yaw/pitch (q quits) |
 | `uv run gazefocus calibrate-cli` | Look at the LG, then the laptop (6 s each); saves `%APPDATA%\GazeFocus\calibration.json` |
