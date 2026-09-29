@@ -127,3 +127,25 @@ def test_default_clocks_are_high_resolution():
 
     for fn in (runtime.collect_phase, runtime.calibrate, runtime.watch_loop, runtime.bench_loop):
         assert inspect.signature(fn).parameters["clock"].default is time.perf_counter, fn.__name__
+
+
+def test_calibrate_cues_each_phase_before_it_records():
+    """Desk session: typed cues arrived seconds late and ruined a calibration; the program must cue itself."""
+    c, said, cues = FakeClock(), [], []
+    rng = np.random.default_rng(2)
+
+    def track(frame, t):
+        base = -32.0 if "LG" in said[-1] else -2.0
+        return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
+
+    first_sample_t = {}
+
+    def tracking(frame, t):
+        phase = "LG" if "LG" in said[-1] else "LAPTOP"
+        first_sample_t.setdefault(phase, t)
+        return track(frame, t)
+
+    calibrate(lambda: FRAME, tracking, clock=c.time, sleep=c.sleep, say=said.append,
+              cue=lambda name: cues.append((name, c.time())))
+    assert [n for n, _ in cues] == ["LG", "LAPTOP", "DONE"]
+    assert cues[0][1] < first_sample_t["LG"] and cues[1][1] < first_sample_t["LAPTOP"]

@@ -34,6 +34,17 @@ def _open_camera(cfg):
     return cam
 
 
+BEEPS = {"LG": 1, "LAPTOP": 2, "DONE": 3}
+
+
+def _beep(name: str) -> None:
+    """1 beep = look at the LG, 2 = look at the laptop, 3 = done."""
+    import winsound
+
+    for _ in range(BEEPS.get(name, 0)):
+        winsound.Beep(1046 if name == "DONE" else 880, 160)
+
+
 def _tracker():
     from gazefocus.paths import model_path
     from gazefocus.vision.tracker import HeadTracker
@@ -68,7 +79,8 @@ def cmd_calibrate(args) -> int:
         return EXIT_CAMERA
     backend, tracker = cam.backend, _tracker()
     try:
-        model, counts = calibrate(cam.read, tracker.process, seconds=args.seconds, fps=cfg.camera.fps)
+        print("listen for beeps: 1 = look at the LG, 2 = look at the laptop, 3 = done")
+        model, counts = calibrate(cam.read, tracker.process, seconds=args.seconds, fps=cfg.camera.fps, cue=_beep)
     except ValueError as e:
         print(f"calibration failed: {e}", file=sys.stderr)
         return EXIT_CALIBRATION
