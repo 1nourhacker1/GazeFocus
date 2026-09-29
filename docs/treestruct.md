@@ -9,7 +9,8 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 |---|---|---|
 | `superpowers/specs/` | **Design, not code-verified.** No source exists yet. | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
-| `reference/` | Not created yet. It will mirror `src/gazefocus/` file by file as code lands. | — |
+| `reference/gazefocus/` | Mirror docs, one per source file; each carries its own `Verified against` sha | per file |
+| `spikes/` | Hardware spike results, pasted from real runs | per file |
 
 ## Contents
 
@@ -18,3 +19,8 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
   - [01: dock style options](superpowers/mockups/01-dock-style-options.html) (superseded)
   - [02: liquid dock](superpowers/mockups/02-dock-liquid-approved.html) (**approved**)
   - [03: calibration flow](superpowers/mockups/03-calibration-approved.html) (**approved**)
+
+## Reference docs
+
+- [gazefocus/types.py](reference/gazefocus/types.md)
+- [gazefocus/paths.py](reference/gazefocus/paths.md)
