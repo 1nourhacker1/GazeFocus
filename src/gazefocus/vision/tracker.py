@@ -47,11 +47,15 @@ class HeadTracker:
         self._landmarker = mp_vision.FaceLandmarker.create_from_options(options)
         self._last_ms: int | None = None
 
-    def process(self, bgr: np.ndarray, t: float) -> HeadSample:
+    def detect(self, bgr: np.ndarray, t: float):
+        """The raw MediaPipe result (landmarks + matrices), for overlays such as the live view."""
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
         self._last_ms = next_timestamp_ms(self._last_ms, t)
-        return sample_from_result(self._landmarker.detect_for_video(image, self._last_ms), t)
+        return self._landmarker.detect_for_video(image, self._last_ms)
+
+    def process(self, bgr: np.ndarray, t: float) -> HeadSample:
+        return sample_from_result(self.detect(bgr, t), t)
 
     def close(self) -> None:
         self._landmarker.close()

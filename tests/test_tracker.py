@@ -37,3 +37,12 @@ def test_real_model_on_black_frame_sees_no_face():
     finally:
         tracker.close()
     assert s.face is False and s2.face is False
+
+
+def test_detect_returns_the_raw_result():
+    tracker = HeadTracker(paths.model_path())
+    try:
+        raw = tracker.detect(np.zeros((480, 640, 3), np.uint8), 0.2)
+    finally:
+        tracker.close()
+    assert raw.face_landmarks == [] and raw.facial_transformation_matrixes == []
