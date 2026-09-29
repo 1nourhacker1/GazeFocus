@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GazeFocus dock style options</title>
+<style>
+body{font-family:-apple-system,'Segoe UI Variable','Segoe UI',system-ui,sans-serif;margin:24px;background:#f5f5f7;color:#1c1c1e}
+.subtitle{color:#6e6e73;line-height:1.5} .section{margin:16px 0} .label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.6}
+.options{display:grid;gap:10px} .option{display:flex;gap:12px;padding:14px;border:1px solid #d2d2d7;border-radius:12px;background:#fff;cursor:pointer}
+.option.selected,.card.selected{border-color:#0a84ff;box-shadow:0 0 0 2px rgba(10,132,255,.25)} .letter{width:28px;height:28px;border-radius:8px;background:#f0f0f3;display:flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+.option h3,.card h3{margin:0 0 4px;font-size:15px} .option p,.card p{margin:0;color:#6e6e73;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px} .card{border:1px solid #d2d2d7;border-radius:12px;overflow:hidden;background:#fff;cursor:pointer} .card-body{padding:12px}
+</style>
+<script>function toggleSelect(el){el.parentElement.querySelectorAll('.option,.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<!-- Brainstorming mockup, 2026-09-29. Status: superseded (style C was chosen, then restyled). Exported standalone from the visual-companion session. -->
+<h2>Dock style: which one feels right?</h2>
+<p class="subtitle">It sits at the top centre of the laptop screen, just under the camera. It stays tiny most of the time so it doesn't cover browser tabs or title bars, and expands when you hover.</p>
+
+<div class="section">
+  <div class="label">Your setup (from the recon)</div>
+  <div style="position:relative;height:150px;background:#0b0e12;border-radius:10px;margin-top:8px;overflow:hidden">
+    <!-- LG: left, higher -->
+    <div style="position:absolute;left:8%;top:14px;width:40%;height:95px;border:2px solid #3a4250;border-radius:4px;background:#141a22;display:flex;align-items:center;justify-content:center;color:#8b949e;font:12px system-ui">LG 24" · 1920×1080</div>
+    <!-- Laptop: right, lower -->
+    <div style="position:absolute;left:52%;top:44px;width:34%;height:92px;border:2px solid #3a4250;border-top-width:9px;border-radius:5px;background:#141a22;display:flex;align-items:center;justify-content:center;color:#8b949e;font:12px system-ui">Laptop 16"</div>
+    <div style="position:absolute;left:calc(69% - 3px);top:46px;width:6px;height:6px;border-radius:50%;background:#58a6ff;box-shadow:0 0 6px #58a6ff"></div>
+    <div style="position:absolute;left:calc(69% - 14px);top:55px;width:28px;height:7px;border-radius:4px;background:#3fb950"></div>
+    <div style="position:absolute;left:calc(69% + 20px);top:50px;color:#58a6ff;font:11px system-ui">← camera + dock</div>
+  </div>
+</div>
+
+<div class="cards">
+
+  <!-- A: pill -->
+  <div class="card" data-choice="pill" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0e12;padding:0">
+      <div style="position:relative;height:96px;background:#0d1117">
+        <div style="height:12px;background:#1b1f24;position:relative"><div style="position:absolute;left:calc(50% - 3px);top:3px;width:6px;height:6px;border-radius:50%;background:#30363d"></div></div>
+        <div style="display:flex;gap:4px;padding:4px 8px"><div style="width:22%;height:16px;background:#1f2630;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div></div>
+        <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:11px;background:rgba(22,27,34,.92);border:1px solid #30363d;font:600 11px system-ui;color:#e6edf3"><span style="width:7px;height:7px;border-radius:50%;background:#3fb950"></span>◀ LG</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;justify-content:center;font:600 11px system-ui">
+        <span style="display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:11px;background:#161b22;border:1px solid #30363d;color:#e6edf3"><span style="width:7px;height:7px;border-radius:50%;background:#3fb950"></span>Laptop</span>
+        <span style="display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:11px;background:#161b22;border:1px solid #30363d;color:#e6edf3"><span style="width:7px;height:7px;border-radius:50%;background:#d29922"></span>⌨ typing</span>
+        <span style="display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:11px;background:#161b22;border:1px solid #30363d;color:#8b949e"><span style="width:7px;height:7px;border-radius:50%;background:#6e7681"></span>no face</span>
+        <span style="display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:11px;background:#161b22;border:1px dashed #6e7681;color:#8b949e">❚❚ paused</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>A · Text pill</h3><p>A coloured dot plus a word: "◀ LG", "Laptop", "typing". About 80×22 px. Readable at a glance, and the widest of the three.</p></div>
+  </div>
+
+  <!-- B: dot -->
+  <div class="card" data-choice="dot" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0e12;padding:0">
+      <div style="position:relative;height:96px;background:#0d1117">
+        <div style="height:12px;background:#1b1f24;position:relative"><div style="position:absolute;left:calc(50% - 3px);top:3px;width:6px;height:6px;border-radius:50%;background:#30363d"></div></div>
+        <div style="display:flex;gap:4px;padding:4px 8px"><div style="width:22%;height:16px;background:#1f2630;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div></div>
+        <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:rgba(22,27,34,.92);border:2px solid #3fb950;display:flex;align-items:center;justify-content:center;color:#3fb950;font:700 11px system-ui">‹</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:12px;justify-content:center;align-items:center;font:10px system-ui;color:#8b949e">
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #3fb950;display:flex;align-items:center;justify-content:center;color:#3fb950;font:700 10px system-ui">•</span>laptop</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #d29922;display:flex;align-items:center;justify-content:center;color:#d29922;font:700 9px system-ui">⌨</span>typing</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #6e7681;display:flex;align-items:center;justify-content:center;color:#6e7681;font:700 10px system-ui">?</span>no face</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="width:18px;height:18px;border-radius:50%;border:2px dashed #6e7681;display:flex;align-items:center;justify-content:center;color:#6e7681;font:700 8px system-ui">❚❚</span>paused</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · Status dot</h3><p>An 18 px ring that looks like a second camera light, with a small arrow inside. The smallest and least distracting, but you have to learn the colours.</p></div>
+  </div>
+
+  <!-- C: two screens -->
+  <div class="card" data-choice="screens" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0e12;padding:0">
+      <div style="position:relative;height:96px;background:#0d1117">
+        <div style="height:12px;background:#1b1f24;position:relative"><div style="position:absolute;left:calc(50% - 3px);top:3px;width:6px;height:6px;border-radius:50%;background:#30363d"></div></div>
+        <div style="display:flex;gap:4px;padding:4px 8px"><div style="width:22%;height:16px;background:#1f2630;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div><div style="width:22%;height:16px;background:#1a2029;border-radius:4px 4px 0 0"></div></div>
+        <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;align-items:flex-start;gap:3px;padding:3px 6px;border-radius:6px;background:rgba(22,27,34,.92);border:1px solid #30363d">
+          <span style="width:18px;height:11px;border-radius:2px;background:#3fb950"></span>
+          <span style="width:14px;height:10px;border-radius:2px;margin-top:3px;border:1px solid #484f58"></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;padding:12px;justify-content:center;align-items:center;font:10px system-ui;color:#8b949e">
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="display:flex;align-items:flex-start;gap:3px;padding:3px 5px;border-radius:5px;border:1px solid #30363d"><span style="width:14px;height:9px;border-radius:2px;border:1px solid #484f58"></span><span style="width:11px;height:8px;margin-top:2px;border-radius:2px;background:#3fb950"></span></span>laptop</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="display:flex;align-items:flex-start;gap:3px;padding:3px 5px;border-radius:5px;border:1px solid #30363d"><span style="width:14px;height:9px;border-radius:2px;background:#d29922"></span><span style="width:11px;height:8px;margin-top:2px;border-radius:2px;border:1px solid #484f58"></span></span>typing</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="display:flex;align-items:flex-start;gap:3px;padding:3px 5px;border-radius:5px;border:1px solid #30363d"><span style="width:14px;height:9px;border-radius:2px;border:1px solid #484f58"></span><span style="width:11px;height:8px;margin-top:2px;border-radius:2px;border:1px solid #484f58"></span></span>no face</span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="display:flex;align-items:flex-start;gap:3px;padding:3px 5px;border-radius:5px;border:1px dashed #6e7681;opacity:.6"><span style="width:14px;height:9px;border-radius:2px;border:1px solid #484f58"></span><span style="width:11px;height:8px;margin-top:2px;border-radius:2px;border:1px solid #484f58"></span></span>paused</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>C · Mini screen map</h3><p>Two tiny rectangles laid out like your real screens, with the LG raised on the left. The lit one is where focus is heading. About 44×20 px, and it explains itself.</p></div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:22px">
+  <div class="label">On hover (the same for every style)</div>
+  <div style="display:flex;gap:14px;align-items:flex-start;margin-top:8px;padding:12px;border-radius:10px;background:#161b22;border:1px solid #30363d;max-width:430px;font:12px system-ui;color:#e6edf3">
+    <div style="position:relative;width:160px;height:120px;border-radius:6px;background:linear-gradient(160deg,#2a2f38,#171a1f);flex:none;overflow:hidden">
+      <div style="position:absolute;left:52px;top:26px;width:52px;height:66px;border:2px solid #3fb950;border-radius:6px"></div>
+      <div style="position:absolute;left:78px;top:58px;width:42px;height:2px;background:#58a6ff;transform:rotate(200deg);transform-origin:0 0"></div>
+      <div style="position:absolute;left:4px;bottom:3px;font:10px ui-monospace,monospace;color:#8b949e">face ✓ 15 fps</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:600 13px system-ui">Looking at: <span style="color:#3fb950">LG</span></div>
+      <div style="font:11px ui-monospace,monospace;color:#8b949e">yaw −34° · pitch +7°<br>margin 0.82 · last key 3.1 s ago</div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <span style="padding:3px 10px;border-radius:6px;background:#21262d;border:1px solid #30363d">❚❚ Pause</span>
+        <span style="padding:3px 10px;border-radius:6px;background:#21262d;border:1px solid #30363d">⟲ Recalibrate</span>
+      </div>
+    </div>
+  </div>
+  <p class="subtitle" style="margin-top:8px">Clicking the collapsed dock toggles pause. The camera preview only runs while you hover.</p>
+</div>
+
+</body></html>

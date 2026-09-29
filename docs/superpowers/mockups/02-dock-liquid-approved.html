@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GazeFocus liquid dock</title>
+<style>
+body{font-family:-apple-system,'Segoe UI Variable','Segoe UI',system-ui,sans-serif;margin:24px;background:#f5f5f7;color:#1c1c1e}
+.subtitle{color:#6e6e73;line-height:1.5} .section{margin:16px 0} .label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.6}
+.options{display:grid;gap:10px} .option{display:flex;gap:12px;padding:14px;border:1px solid #d2d2d7;border-radius:12px;background:#fff;cursor:pointer}
+.option.selected,.card.selected{border-color:#0a84ff;box-shadow:0 0 0 2px rgba(10,132,255,.25)} .letter{width:28px;height:28px;border-radius:8px;background:#f0f0f3;display:flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+.option h3,.card h3{margin:0 0 4px;font-size:15px} .option p,.card p{margin:0;color:#6e6e73;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px} .card{border:1px solid #d2d2d7;border-radius:12px;overflow:hidden;background:#fff;cursor:pointer} .card-body{padding:12px}
+</style>
+<script>function toggleSelect(el){el.parentElement.querySelectorAll('.option,.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<!-- Brainstorming mockup, 2026-09-29. Status: APPROVED. Exported standalone from the visual-companion session. -->
+<style>
+#gf{font-family:-apple-system,'Segoe UI Variable','Segoe UI',system-ui,sans-serif}
+#gf .gf-bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:12px 0 14px;font-size:12px}
+#gf .gf-grp{display:flex;gap:4px;align-items:center}
+#gf .gf-grp>span{opacity:.6;margin-right:3px}
+#gf .gf-btn{font:500 12px inherit;font-family:inherit;padding:4px 11px;border-radius:999px;border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.08);color:inherit;cursor:pointer}
+#gf .gf-btn.on{background:#0a84ff;border-color:#0a84ff;color:#fff}
+#gf .th-light{--glass:rgba(255,255,255,.36);--glassX:rgba(255,255,255,.74);--glyph:rgba(28,28,32,.82);--text:#1c1c1e;--sub:rgba(60,60,67,.72);--solid:#f2f2f7;--btn:rgba(0,0,0,.07)}
+#gf .th-dark{--glass:rgba(58,58,64,.32);--glassX:rgba(38,38,44,.70);--glyph:rgba(255,255,255,.88);--text:#f5f5f7;--sub:rgba(235,235,245,.62);--solid:#2c2c2e;--btn:rgba(255,255,255,.12)}
+#gf .th-wall{--glass:rgba(24,18,40,.18);--glassX:rgba(22,18,36,.55);--glyph:rgba(255,255,255,.92);--text:#fff;--sub:rgba(255,255,255,.72);--solid:#2c2c2e;--btn:rgba(255,255,255,.16)}
+#gf .gf-device{max-width:760px;margin:0 auto;border-radius:16px 16px 6px 6px;background:#0c0c0e;padding:0 10px 10px;box-shadow:0 12px 34px rgba(0,0,0,.28)}
+#gf .gf-bezel{height:16px;position:relative}
+#gf .gf-bezel i{position:absolute;left:50%;top:5px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#3d4d70,#07070c 70%);box-shadow:0 0 0 1.5px #1b1b20}
+#gf .gf-screen{position:relative;height:250px;border-radius:4px;overflow:hidden}
+#gf .gf-bgc{position:absolute;inset:0}
+#gf .gf-dock,#gf .gf-zdock{position:absolute;left:50%;transform:translateX(-50%);background:var(--glass);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);box-shadow:inset 0 .5px 0 rgba(255,255,255,.85),inset 0 0 0 .5px rgba(255,255,255,.30),inset 0 -5px 9px -6px rgba(255,255,255,.45),0 5px 16px rgba(0,0,0,.22),0 1px 2px rgba(0,0,0,.2);overflow:hidden}
+#gf .gf-dock::before,#gf .gf-zdock::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(130% 100% at 28% -20%,rgba(255,255,255,.55),rgba(255,255,255,0) 55%);opacity:.55;pointer-events:none}
+#gf .gf-dock::after,#gf .gf-zdock::after{content:'';position:absolute;inset:0;z-index:2;border-radius:inherit;box-shadow:inset 1.5px 1.5px 2px -1px rgba(255,255,255,.75),inset -1.5px -1.5px 2px -1px rgba(255,255,255,.3);pointer-events:none}
+#gf .gf-dock{top:4px;z-index:5;cursor:pointer;width:calc(44px*var(--s));height:calc(20px*var(--s));border-radius:calc(10px*var(--s));transition:width .52s cubic-bezier(.3,1.45,.5,1),height .52s cubic-bezier(.3,1.45,.5,1),border-radius .52s cubic-bezier(.3,1.45,.5,1),background .3s}
+#gf .gf-dock.x{width:300px;height:158px;border-radius:26px;background:var(--glassX)}
+#gf.rm .gf-dock{transition:background .15s}
+#gf.rt .gf-dock,#gf.rt .gf-zdock{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--solid)}
+#gf .gf-svg{position:absolute;z-index:1;left:50%;top:0;transform:translateX(-50%);width:calc(44px*var(--s));height:calc(20px*var(--s));display:block;overflow:visible}
+#gf .gf-st{stroke:var(--glyph)}
+#gf .gf-pz rect{fill:var(--glyph)}
+#gf .gf-panel{position:absolute;z-index:1;left:12px;right:12px;top:calc(20px*var(--s) + 6px);bottom:12px;display:flex;gap:11px;opacity:0;transform:translateY(-8px) scale(.96);transform-origin:top center;transition:opacity .16s,transform .34s cubic-bezier(.3,1.4,.5,1);pointer-events:none;color:var(--text);font-size:12px}
+#gf .gf-dock.x .gf-panel{opacity:1;transform:none;transition-delay:.1s;pointer-events:auto}
+#gf.rm .gf-panel{transform:none!important}
+#gf .gf-prev{position:relative;width:112px;flex:none;border-radius:12px;background:linear-gradient(160deg,#3a3f4a,#15171c);overflow:hidden}
+#gf .gf-face{position:absolute;left:37px;top:16px;width:38px;height:50px;border:1.5px solid #30d158;border-radius:14px;transition:border-color .2s,opacity .2s}
+#gf .gf-ray{position:absolute;left:56px;top:41px;height:2px;width:8px;background:linear-gradient(90deg,#0a84ff,rgba(10,132,255,0));transform-origin:0 50%;transition:transform .3s,width .3s,opacity .2s}
+#gf .gf-prev span{position:absolute;left:7px;bottom:5px;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:rgba(255,255,255,.72)}
+#gf .gf-info{display:flex;flex-direction:column;gap:5px;min-width:0}
+#gf .gf-title{font-weight:600;font-size:13px}
+#gf .gf-mono{font:10.5px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--sub);line-height:1.5}
+#gf .gf-pb{display:flex;gap:6px;margin-top:auto}
+#gf .gf-pb button{font:500 11.5px inherit;font-family:inherit;color:var(--text);background:var(--btn);border:.5px solid rgba(127,127,127,.3);border-radius:999px;padding:4px 10px;cursor:pointer}
+#gf .gf-zlabel{max-width:760px;margin:18px auto 6px;font-size:12px;opacity:.65}
+#gf .gf-zoom{position:relative;max-width:760px;height:150px;margin:0 auto;border-radius:14px;overflow:hidden}
+#gf .gf-zbg{position:absolute;left:50%;top:0;height:250px;transform-origin:50% 0;transform:translateX(-50%) scale(5)}
+#gf .gf-zdock{top:20px;width:220px;height:100px;border-radius:50px;backdrop-filter:blur(34px) saturate(1.7);-webkit-backdrop-filter:blur(34px) saturate(1.7)}
+#gf .gf-zdock svg{position:absolute;z-index:1;inset:0;width:220px;height:100px;overflow:visible}
+#gf .gf-notes{max-width:760px;margin:18px auto 0;font-size:13px;line-height:1.55}
+#gf .gf-notes li{margin:3px 0}
+</style>
+
+<div id="gf">
+<h2>Liquid dock v2: the selected screen grows</h2>
+<p class="subtitle">Flow animation at 1.75×. Both tiles now share one base size, and the one with focus swells as the water pours in. Hover the dock for about ⅓ s to open the panel; clicking it pauses tracking.</p>
+
+<div class="gf-bar" id="gfBar">
+  <div class="gf-grp"><span>You look at</span><button class="gf-btn" data-act="gaze:lg">◀ LG</button><button class="gf-btn" data-act="gaze:laptop">Laptop</button></div>
+  <div class="gf-grp"><span>Events</span><button class="gf-btn" data-act="typing">⌨ Typing</button><button class="gf-btn" data-act="face">Look away</button><button class="gf-btn" data-act="pause">❚❚ Pause</button></div>
+  <div class="gf-grp"><span>Behind it</span><button class="gf-btn" data-act="theme:light">Browser</button><button class="gf-btn" data-act="theme:dark">Dark IDE</button><button class="gf-btn" data-act="theme:wall">Wallpaper</button></div>
+  <div class="gf-grp"><span>Size</span><button class="gf-btn" data-act="size:1.5">1.5×</button><button class="gf-btn" data-act="size:1.75">1.75×</button><button class="gf-btn" data-act="size:2">2×</button></div>
+</div>
+
+<div id="gfWrap" class="th-light" style="--s:1.75">
+  <div class="gf-device">
+    <div class="gf-bezel"><i></i></div>
+    <div class="gf-screen" id="gfScreen">
+      <div class="gf-bgc" id="gfBg"></div>
+      <div class="gf-dock" id="gfDock" role="button" aria-label="Gaze focus: laptop">
+        <svg class="gf-svg" id="gfSvg" viewBox="0 0 88 40"></svg>
+        <div class="gf-panel">
+          <div class="gf-prev"><div class="gf-face" id="gfFace"></div><div class="gf-ray" id="gfRay"></div><span id="gfFps">face ✓ · 15 fps</span></div>
+          <div class="gf-info">
+            <div class="gf-title" id="gfLook">Focus: Laptop</div>
+            <div class="gf-mono" id="gfMono"></div>
+            <div class="gf-pb"><button id="gfPauseBtn">Pause</button><button id="gfCalBtn">Recalibrate</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="gf-zlabel">Magnified 5× (at 1× size), so you can see the liquid</div>
+  <div class="gf-zoom" id="gfZoom">
+    <div class="gf-zbg" id="gfZbg"></div>
+    <div class="gf-zdock"><svg id="gfZsvg" viewBox="0 0 88 40"></svg></div>
+  </div>
+</div>
+
+<h3 style="margin-top:22px">Does the grow-when-selected tile feel right?</h3>
+<div class="options">
+  <div class="option" data-choice="grow-ok" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>Yes, lock it in</h3><p>Both tiles share one base size. The selected one swells about 18% with a springy bounce as the water arrives, and the other shrinks back.</p></div>
+  </div>
+  <div class="option" data-choice="grow-more" onclick="toggleSelect(this)">
+    <div class="letter">↕</div>
+    <div class="content"><h3>Close, but the size difference is off</h3><p>Tell me in the terminal whether you want it more or less pronounced.</p></div>
+  </div>
+</div>
+
+<div class="gf-notes">
+  <b>What's real on Windows and what's approximated</b>
+  <ul>
+    <li><b>Real:</b> the frosted blur of whatever is behind the dock. It uses Windows' own acrylic material, the same effect the Windows 11 Start menu uses.</li>
+    <li><b>Real:</b> the water, drops, rim light and wobble. We draw these in Qt Quick on the GPU, and they only animate during a change (about 0.5 s). The rest of the time nothing redraws, so there's no battery cost.</li>
+    <li><b>Approximated:</b> Apple's true refraction, where content visibly bends at the glass edge. Windows can't do that without screen-capturing behind the dock 30 times a second. The rim highlights you see here are the stand-in.</li>
+    <li><b>Deliberately calm:</b> nothing moves when nothing changes. The dock sits in your peripheral vision under the camera, and motion there would pull your eyes back to the laptop and cause false switches.</li>
+    <li><b>Always full glass and motion:</b> the dock ignores Windows' "Animation effects" and "Transparency effects" settings, as you asked.</li>
+    <li><b>Shape cues as well as colour:</b> a <i>bigger tile</i> is where focus is, a <i>lid</i> means frozen while you type, an <i>empty</i> dock means no face, and <i>bars</i> mean paused.</li>
+  </ul>
+</div>
+</div>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+const T={lg:{x:18,y:10,w:22,h:14},laptop:{x:48,y:14,w:22,h:14}};
+const BIG=1.18,SMALL=0.9;
+const IN=1.7;
+const THEMES={light:{green:[40,167,69],amber:[214,120,0]},dark:{green:[48,209,88],amber:[255,159,10]},wall:{green:[48,209,88],amber:[255,159,10]}};
+const S={focus:'laptop',gaze:'laptop',typing:false,face:true,paused:false,fill:{lg:0,laptop:1},amp:{lg:0,laptop:0},phase:0,colorKey:'green',color:[40,167,69],lid:0,dim:0,drops:[],parts:[],steam:[],ripples:[],variant:'flow',rm:false,rt:false,theme:'light',size:1.75,sc:{lg:SMALL,laptop:BIG}};
+const E={lin:t=>t,inOut:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,in:t=>t*t*t,out:t=>1-Math.pow(1-t,3),spring:t=>t>=1?1:1-Math.exp(-5.5*t)*Math.cos(9*t)};
+const tweens=[];
+function tween(dur,fn,e,delay){return new Promise(res=>tweens.push({t0:performance.now()+(delay||0),dur:Math.max(1,dur),fn,e:e||E.inOut,res}));}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mix=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)];
+let chain=Promise.resolve();
+function run(f){chain=chain.then(f).catch(err=>console.error(err));return chain;}
+function mk(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+let uid=0;
+function build(svg){
+  const id='gfq'+(uid++);const defs=mk('defs',{},svg);
+  const f=mk('filter',{id:id+'goo',x:'-50%',y:'-50%',width:'200%',height:'200%'},defs);
+  mk('feGaussianBlur',{in:'SourceGraphic',stdDeviation:'1.05',result:'b'},f);
+  mk('feColorMatrix',{in:'b',mode:'matrix',values:'1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -7'},f);
+  for(const k in T){const t=T[k];const cp=mk('clipPath',{id:id+'c'+k},defs);mk('rect',{x:t.x+IN,y:t.y+IN,width:t.w-2*IN,height:t.h-2*IN,rx:2.2},cp);}
+  const R={outline:{},water:{},hl:{},lid:{},tf:{lg:[],laptop:[]}};
+  for(const k in T){const t=T[k];R.outline[k]=mk('rect',{x:t.x,y:t.y,width:t.w,height:t.h,rx:3.6,fill:'none','stroke-width':1.3,class:'gf-st'},svg);R.tf[k].push(R.outline[k]);}
+  const goo=mk('g',{filter:'url(#'+id+'goo)'},svg);
+  for(const k in T){const g=mk('g',{'clip-path':'url(#'+id+'c'+k+')'},goo);R.water[k]=mk('path',{},g);R.tf[k].push(g);}
+  R.drops=mk('g',{},goo);
+  for(const k in T){R.hl[k]=mk('ellipse',{rx:2.4,ry:0.8,fill:'#fff'},svg);R.tf[k].push(R.hl[k]);}
+  R.dropHL=mk('g',{},svg);
+  for(const k in T){const t=T[k];R.lid[k]=mk('line',{x1:t.x+2.6,x2:t.x+t.w-2.6,y1:t.y+2.5,y2:t.y+2.5,'stroke-width':1.25,'stroke-linecap':'round',class:'gf-st'},svg);R.tf[k].push(R.lid[k]);}
+  R.fx=mk('g',{},svg);
+  R.pause=mk('g',{class:'gf-pz'},svg);mk('rect',{x:40.2,y:13.5,width:2.8,height:10,rx:1.1},R.pause);mk('rect',{x:45,y:13.5,width:2.8,height:10,rx:1.1},R.pause);
+  return R;
+}
+function lvl(k){const t=T[k];const top=t.y+IN,bot=t.y+t.h-IN;return bot-S.fill[k]*(bot-top+0.6);}
+function wpath(k){const t=T[k];const x0=t.x+IN-0.5,x1=t.x+t.w-IN+0.5,bot=t.y+t.h-IN+1.5;const L=lvl(k);const a=S.amp[k]*Math.min(1,S.fill[k]*3);const N=16;let d='M'+x0+' '+bot;for(let i=0;i<=N;i++){const x=lerp(x0,x1,i/N);const y=L+a*Math.sin(i/N*Math.PI*2.4+S.phase+(k==='lg'?0:1.9));d+=' L'+x.toFixed(2)+' '+y.toFixed(2);}return d+' L'+x1+' '+bot+' Z';}
+function clear(g){while(g.firstChild)g.removeChild(g.firstChild);}
+const f2=v=>v.toFixed(2);
+function render(R){
+  const col='rgb('+S.color.map(v=>Math.round(v)).join(',')+')';
+  for(const k in T){const t=T[k];
+    R.water[k].setAttribute('d',wpath(k));R.water[k].setAttribute('fill',col);
+    const L=lvl(k);R.hl[k].setAttribute('cx',f2(t.x+IN+3.4));R.hl[k].setAttribute('cy',f2(L+1.5));
+    R.hl[k].setAttribute('opacity',S.fill[k]>0.03?f2(0.6*Math.min(1,S.fill[k]*2)):'0');
+    R.lid[k].setAttribute('opacity',f2(k===S.focus?S.lid*0.95:0));
+    R.outline[k].setAttribute('opacity',f2(0.78-0.5*S.dim));
+    const cx=t.x+t.w/2,cy=t.y+t.h/2,s=S.sc[k];const tf='translate('+f2(cx)+' '+f2(cy)+') scale('+s.toFixed(3)+') translate('+f2(-cx)+' '+f2(-cy)+')';
+    for(const el of R.tf[k])el.setAttribute('transform',tf);}
+  clear(R.drops);clear(R.dropHL);clear(R.fx);
+  for(const d of S.drops){if(d.rx<0.05)continue;mk('ellipse',{cx:f2(d.x),cy:f2(d.y),rx:f2(d.rx),ry:f2(Math.max(0.05,d.ry)),transform:'rotate('+(d.rot||0).toFixed(1)+' '+f2(d.x)+' '+f2(d.y)+')',fill:col},R.drops);
+    if(d.rx>1.6)mk('circle',{cx:f2(d.x-d.rx*0.3),cy:f2(d.y-d.ry*0.4),r:f2(d.rx*0.22),fill:'#fff',opacity:'0.75'},R.dropHL);}
+  for(const p of S.parts)mk('circle',{cx:f2(p.x),cy:f2(p.y),r:f2(p.r),fill:col},R.drops);
+  for(const s of S.steam)mk('circle',{cx:f2(s.x),cy:f2(s.y),r:f2(s.r),fill:col,opacity:f2(s.o)},R.fx);
+  for(const r of S.ripples){const a={cx:f2(r.x),cy:f2(r.y),rx:f2(r.r),ry:f2(r.r*(r.flat||1)),fill:'none','stroke-width':'0.8',opacity:f2(r.o)};if(r.c==='w')a.stroke=col;else a['class']='gf-st';mk('ellipse',a,R.fx);}
+  R.pause.setAttribute('opacity',f2(S.dim));
+}
+function loop(now){
+  for(let i=tweens.length-1;i>=0;i--){const w=tweens[i];if(now<w.t0)continue;const p=Math.min(1,(now-w.t0)/w.dur);w.fn(w.e(p),p);if(p>=1){tweens.splice(i,1);w.res();}}
+  if(!S.rm)S.phase+=0.17;
+  const decay=S.rm?0:(S.lid>0.5?0.9:0.955);for(const k in S.amp)S.amp[k]*=decay;
+  for(let i=S.parts.length-1;i>=0;i--){const p=S.parts[i];p.vy+=0.05;p.x+=p.vx;p.y+=p.vy;if(p.vy>0&&p.y>p.until)S.parts.splice(i,1);}
+  for(let i=S.steam.length-1;i>=0;i--){const s=S.steam[i];s.y+=s.vy;s.x+=Math.sin(now/180+s.seed)*0.04;s.o*=0.962;s.r*=1.012;if(s.o<0.03)S.steam.splice(i,1);}
+  for(let i=S.ripples.length-1;i>=0;i--){const r=S.ripples[i];r.r+=r.sp;r.o*=0.9;if(r.o<0.03)S.ripples.splice(i,1);}
+  render(R1);render(R2);
+  requestAnimationFrame(loop);
+}
+function bez(p0,p1,p2,t){const u=1-t;return{x:u*u*p0.x+2*u*t*p1.x+t*t*p2.x,y:u*u*p0.y+2*u*t*p1.y+t*t*p2.y};}
+async function doSwitch(to){
+  const from=S.focus;if(from===to)return;S.focus=to;ui();
+  if(S.rm){await tween(170,e=>{S.fill[from]=1-e;S.fill[to]=e;},E.lin);return;}
+  const A=T[from],B=T[to];
+  const p0={x:A.x+A.w/2,y:lvl(from)+1.5},p2={x:B.x+B.w/2,y:B.y+B.h*0.62},p1={x:(p0.x+p2.x)/2,y:Math.min(A.y,B.y)-6};
+  const D=580;
+  const s0f=S.sc[from],s0t=S.sc[to];
+  tween(D*0.55,e=>{S.sc[from]=lerp(s0f,SMALL,e);},E.inOut);
+  tween(D*0.75,e=>{S.sc[to]=lerp(s0t,BIG,e);},E.spring,D*0.42);
+  tween(D*0.5,e=>{S.fill[from]=1-e;S.amp[from]=Math.max(S.amp[from],1.0*(1-e));},E.in);
+  if(S.variant==='flow'){
+    tween(D,(e,p)=>{S.drops=[];for(let i=0;i<6;i++){let q=p*1.4-i*0.08;if(q<=0||q>=1)continue;q=E.inOut(q);const pt=bez(p0,p1,p2,q);const r=(2.7-i*0.18)*Math.pow(Math.sin(Math.PI*q),0.55);S.drops.push({x:pt.x,y:pt.y,rx:r,ry:r,rot:0});}},E.lin);
+  }else{
+    tween(D*0.85,(e,p)=>{if(p>=1){S.drops=[];return;}const q=E.inOut(p);const pt=bez(p0,p1,p2,q),pn=bez(p0,p1,p2,Math.min(1,q+0.03));const ang=Math.atan2(pn.y-pt.y,pn.x-pt.x)*180/Math.PI;const v=Math.sin(Math.PI*q);const r=3.0*Math.min(1,p*5)*(p>0.92?(1-p)/0.08:1);S.drops=[{x:pt.x,y:pt.y,rx:r*(1+0.5*v),ry:r*(1-0.32*v),rot:ang}];},E.lin);
+    setTimeout(()=>{S.ripples.push({x:p2.x,y:B.y+B.h*0.45,r:1.5,sp:0.55,o:0.9,c:'w',flat:0.45});for(const vx of [-0.28,0.3])S.parts.push({x:p2.x,y:B.y+B.h*0.5,vx:vx,vy:-0.75,r:0.9,until:B.y+B.h*0.55});},D*0.8);
+  }
+  await tween(D*0.55,e=>{S.fill[to]=e;S.amp[to]=Math.max(S.amp[to],1.8*(1-e)+0.3);},E.out,D*(S.variant==='flow'?0.5:0.68));
+  S.drops=[];
+}
+async function evaporate(){const k=S.focus;if(S.rm){await tween(170,e=>{S.fill[k]=Math.min(S.fill[k],1-e);},E.lin);return;}
+  const t=T[k];for(let i=0;i<5;i++)setTimeout(()=>S.steam.push({x:t.x+4+Math.random()*(t.w-8),y:lvl(k)-0.5,r:0.7+Math.random()*0.5,o:0.85,vy:-0.13-Math.random()*0.07,seed:Math.random()*6}),i*90);
+  await tween(560,e=>{S.fill[k]=Math.min(S.fill[k],1-e);},E.inOut);}
+async function condense(){const k=S.focus;if(S.rm){await tween(170,e=>{S.fill[k]=Math.max(S.fill[k],e);},E.lin);return;}
+  const t=T[k];[0.28,0.5,0.72].forEach((fr,i)=>setTimeout(()=>S.parts.push({x:t.x+t.w*fr,y:t.y-4-i,vx:0,vy:0.2,r:1.25,until:t.y+t.h*0.6}),i*70));
+  await tween(500,e=>{S.fill[k]=Math.max(S.fill[k],e);S.amp[k]=Math.max(S.amp[k],1.1*(1-e));},E.out,160);}
+async function drain(){const k=S.focus;await tween(S.rm?170:440,e=>{S.fill[k]=Math.min(S.fill[k],1-e);if(!S.rm)S.amp[k]=Math.max(S.amp[k],0.6);},S.rm?E.lin:E.in);}
+function decide(){run(async()=>{
+  if(S.paused||!S.face)return;
+  if(S.typing){if(S.gaze!==S.focus&&!S.rm)S.amp[S.focus]=Math.max(S.amp[S.focus],0.9);return;}
+  if(S.gaze!==S.focus){await wait(S.rm?0:220);if(!S.typing&&!S.paused&&S.face&&S.gaze!==S.focus)await doSwitch(S.gaze);}
+});}
+function setTyping(on){S.typing=on;ui();
+  if(on){S.colorKey='amber';run(()=>{const c0=S.color.slice();return tween(180,e=>{S.lid=Math.max(S.lid,e);S.color=mix(c0,THEMES[S.theme].amber,e);},E.out);});}
+  else{run(()=>{const c0=S.color.slice();return tween(1500,e=>{S.lid=1-e;S.color=mix(c0,THEMES[S.theme].green,Math.min(1,e*1.2));},E.lin).then(()=>{S.colorKey='green';});});decide();}}
+function setFace(on){S.face=on;ui();if(S.paused)return;if(!on)run(evaporate);else{run(condense);decide();}}
+function setPaused(p){S.paused=p;ui();
+  if(p)run(async()=>{const a=S.sc.lg,b=S.sc.laptop;tween(420,e=>{S.sc.lg=lerp(a,1,e);S.sc.laptop=lerp(b,1,e);},E.inOut);tween(380,e=>{S.dim=Math.max(S.dim,e);},E.out);if(S.face)await drain();});
+  else{run(async()=>{const k=S.focus,o=k==='lg'?'laptop':'lg';tween(640,e=>{S.sc[k]=lerp(1,BIG,e);S.sc[o]=lerp(1,SMALL,e);},E.spring,120);tween(300,e=>{S.dim=Math.min(S.dim,1-e);},E.out);if(S.face)await condense();});decide();}}
+function setTheme(k){S.theme=k;const w=document.getElementById('gfWrap');w.className='th-'+(k==='wall'?'wall':k);document.getElementById('gfBg').innerHTML=bgHTML(k);document.getElementById('gfZbg').innerHTML=bgHTML(k);S.color=THEMES[k][S.colorKey].slice();sizeZoom();ui();}
+function bgHTML(k){
+  if(k==='light'){const tabs=['#ea4335','#1a73e8','#34a853','#f9ab00','#a142f4'].map((c,i)=>'<div style="width:128px;height:28px;border-radius:9px 9px 0 0;background:'+(i===2?'#fff':'rgba(255,255,255,.45)')+';display:flex;align-items:center;gap:6px;padding:0 9px;flex:none"><i style="width:12px;height:12px;border-radius:3px;background:'+c+'"></i><b style="flex:1;height:6px;border-radius:3px;background:rgba(0,0,0,.18)"></b></div>').join('');
+    const lines=[92,88,95,70,90,60].map(w=>'<b style="display:block;height:7px;width:'+w+'%;background:#dadce0;border-radius:4px;margin-top:10px"></b>').join('');
+    return '<div style="position:absolute;inset:0;background:#fff"><div style="height:36px;background:#dfe1e5;display:flex;align-items:flex-end;gap:3px;padding:0 10px;overflow:hidden">'+tabs+'</div><div style="height:34px;border-bottom:1px solid #e6e6e6;display:flex;align-items:center;padding:0 12px;gap:8px"><i style="width:14px;height:14px;border-radius:50%;background:#e8eaed"></i><b style="flex:1;height:22px;border-radius:11px;background:#f1f3f4"></b></div><div style="display:grid;grid-template-columns:1.6fr 1fr;gap:14px;padding:16px 20px"><div><b style="display:block;height:14px;width:60%;background:#202124;border-radius:4px;opacity:.85"></b>'+lines+'</div><div style="height:130px;border-radius:12px;background:linear-gradient(135deg,#ff8a65,#ba68c8 55%,#4fc3f7)"></div></div></div>';}
+  if(k==='dark'){const tabs=['#e8bf6a','#6aab73','#56a8f5','#c77dbb'].map((c,i)=>'<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;flex:none;background:'+(i===1?'#1e1f22':'transparent')+'"><i style="width:9px;height:9px;border-radius:2px;background:'+c+'"></i><b style="width:'+(60+i*14)+'px;height:6px;border-radius:3px;background:rgba(255,255,255,.28)"></b></div>').join('');
+    const L=[[0,[['#cf8e6d',44],['#bcbec4',96]]],[0,[['#cf8e6d',60],['#56a8f5',110],['#bcbec4',20]]],[22,[['#c77dbb',70],['#bcbec4',14],['#6aab73',150]]],[22,[['#cf8e6d',36],['#56a8f5',84],['#bcbec4',60]]],[44,[['#bcbec4',120],['#2aacb8',30]]],[44,[['#7a7e85',210]]],[22,[['#cf8e6d',50],['#bcbec4',70]]],[0,[['#bcbec4',12]]],[0,[['#cf8e6d',44],['#56a8f5',130]]],[22,[['#6aab73',180],['#bcbec4',40]]]];
+    const lines=L.map(l=>'<div style="display:flex;gap:6px;height:18px;align-items:center;padding-left:'+l[0]+'px">'+l[1].map(s=>'<b style="width:'+s[1]+'px;height:7px;border-radius:3px;background:'+s[0]+';opacity:.85"></b>').join('')+'</div>').join('');
+    return '<div style="position:absolute;inset:0;background:#1e1f22"><div style="height:32px;background:#2b2d30;display:flex;align-items:center;gap:4px;padding:0 10px;overflow:hidden">'+tabs+'</div><div style="padding:12px 16px">'+lines+'</div></div>';}
+  return '<div style="position:absolute;inset:0;background:radial-gradient(55% 75% at 18% 8%,#ff9a62 0,rgba(255,154,98,0) 70%),radial-gradient(45% 70% at 70% 0%,#8b6cff 0,rgba(139,108,255,0) 70%),radial-gradient(70% 90% at 50% 110%,#12a39a 0,rgba(18,163,154,0) 70%),#2a2350"></div>';
+}
+function sizeZoom(){const sc=document.getElementById('gfScreen');document.getElementById('gfZbg').style.width=sc.clientWidth+'px';}
+function ui(){
+  const bar=document.getElementById('gfBar');
+  bar.querySelectorAll('[data-act]').forEach(b=>{const a=b.dataset.act;let on=false;
+    if(a.startsWith('gaze:'))on=S.gaze===a.slice(5);else if(a==='typing')on=S.typing;else if(a==='face')on=!S.face;else if(a==='pause')on=S.paused;
+    else if(a.startsWith('theme:'))on=S.theme===a.slice(6);else if(a.startsWith('size:'))on=S.size===parseFloat(a.slice(5));else if(a==='rm')on=S.rm;else if(a==='rt')on=S.rt;
+    b.classList.toggle('on',on);});
+  const look=document.getElementById('gfLook'),mono=document.getElementById('gfMono');
+  const name=S.focus==='lg'?'LG':'Laptop';
+  look.textContent=S.paused?'Paused':!S.face?'No face, holding '+name:S.typing?'Frozen while typing':'Focus: '+name;
+  const yaw=S.gaze==='lg'?'yaw −34° · pitch +7°':'yaw −3° · pitch −8°';
+  mono.innerHTML=(S.face?yaw:'yaw — · pitch —')+'<br>margin '+(S.face?(S.gaze==='lg'?'0.82':'0.91'):'—')+' · last key '+(S.typing?'0.0':'3.1')+' s ago';
+  document.getElementById('gfPauseBtn').textContent=S.paused?'Resume':'Pause';
+  document.getElementById('gfFps').textContent=S.paused?'camera off':S.face?'face ✓ · 15 fps':'no face · 15 fps';
+  const face=document.getElementById('gfFace'),ray=document.getElementById('gfRay');
+  face.style.opacity=S.face&&!S.paused?1:0.15;ray.style.opacity=S.face&&!S.paused?1:0;
+  if(S.gaze==='lg'){ray.style.width='40px';ray.style.transform='rotate(195deg)';}else{ray.style.width='8px';ray.style.transform='rotate(90deg)';}
+  document.getElementById('gfDock').setAttribute('aria-label','Gaze focus: '+look.textContent);
+  const g=document.getElementById('gf');g.classList.toggle('rm',S.rm);g.classList.toggle('rt',S.rt);
+  document.getElementById('gfWrap').style.setProperty('--s',S.size);
+}
+document.getElementById('gfBar').addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a.startsWith('gaze:')){S.gaze=a.slice(5);ui();decide();}
+  else if(a==='typing')setTyping(!S.typing);
+  else if(a==='face')setFace(!S.face);
+  else if(a==='pause')setPaused(!S.paused);
+  else if(a.startsWith('theme:'))setTheme(a.slice(6));
+  else if(a.startsWith('size:')){S.size=parseFloat(a.slice(5));ui();}
+  else if(a==='rm'){S.rm=!S.rm;ui();}
+  else if(a==='rt'){S.rt=!S.rt;ui();}
+});
+const dock=document.getElementById('gfDock');let hT;
+dock.addEventListener('mouseenter',()=>{clearTimeout(hT);hT=setTimeout(()=>dock.classList.add('x'),350);});
+dock.addEventListener('mouseleave',()=>{clearTimeout(hT);hT=setTimeout(()=>dock.classList.remove('x'),250);});
+dock.addEventListener('click',ev=>{if(ev.target.closest('.gf-panel'))return;const r=document.getElementById('gfSvg').getBoundingClientRect();
+  if(!S.rm)S.ripples.push({x:(ev.clientX-r.left)/r.width*88,y:(ev.clientY-r.top)/r.height*40,r:1,sp:0.9,o:0.7,c:'g'});setPaused(!S.paused);});
+document.getElementById('gfPauseBtn').addEventListener('click',ev=>{ev.stopPropagation();setPaused(!S.paused);});
+document.getElementById('gfCalBtn').addEventListener('click',ev=>{ev.stopPropagation();const b=ev.currentTarget;b.textContent='Look at the LG…';setTimeout(()=>{b.textContent='Recalibrate';},1400);});
+window.gfVariant=v=>{S.variant=v;S.gaze=S.focus==='lg'?'laptop':'lg';ui();decide();};
+window.addEventListener('resize',sizeZoom);
+const R1=build(document.getElementById('gfSvg')),R2=build(document.getElementById('gfZsvg'));
+setTheme('light');
+requestAnimationFrame(loop);
+})();
+</script>
+
+</body></html>

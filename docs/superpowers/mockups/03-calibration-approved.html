@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GazeFocus calibration</title>
+<style>
+body{font-family:-apple-system,'Segoe UI Variable','Segoe UI',system-ui,sans-serif;margin:24px;background:#f5f5f7;color:#1c1c1e}
+.subtitle{color:#6e6e73;line-height:1.5} .section{margin:16px 0} .label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.6}
+.options{display:grid;gap:10px} .option{display:flex;gap:12px;padding:14px;border:1px solid #d2d2d7;border-radius:12px;background:#fff;cursor:pointer}
+.option.selected,.card.selected{border-color:#0a84ff;box-shadow:0 0 0 2px rgba(10,132,255,.25)} .letter{width:28px;height:28px;border-radius:8px;background:#f0f0f3;display:flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+.option h3,.card h3{margin:0 0 4px;font-size:15px} .option p,.card p{margin:0;color:#6e6e73;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px} .card{border:1px solid #d2d2d7;border-radius:12px;overflow:hidden;background:#fff;cursor:pointer} .card-body{padding:12px}
+</style>
+<script>function toggleSelect(el){el.parentElement.querySelectorAll('.option,.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<!-- Brainstorming mockup, 2026-09-29. Status: APPROVED (guidance: follow the drop). Exported standalone from the visual-companion session. -->
+<style>
+#cal{font-family:-apple-system,'Segoe UI Variable','Segoe UI',system-ui,sans-serif}
+#cal .c-bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:12px 0 14px;font-size:12px}
+#cal .c-grp{display:flex;gap:4px;align-items:center}
+#cal .c-grp>span{opacity:.6;margin-right:3px}
+#cal .c-btn{font:500 12px inherit;font-family:inherit;padding:4px 11px;border-radius:999px;border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.08);color:inherit;cursor:pointer}
+#cal .c-btn.on{background:#0a84ff;border-color:#0a84ff;color:#fff}
+#cal .c-steps{display:flex;gap:4px}
+#cal .c-step{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(127,127,127,.1);opacity:.55;transition:all .25s}
+#cal .c-step.on{opacity:1;background:rgba(48,209,88,.18);color:#1f9c45;font-weight:600}
+#cal .desk{position:relative;width:100%;aspect-ratio:100/33;border-radius:16px;background:linear-gradient(180deg,#e9eaee,#d9dbe1);overflow:hidden}
+#cal .scr{position:absolute;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#cal .lg{left:3%;top:3%;width:50%;aspect-ratio:16/9;border:6px solid #111;border-radius:8px}
+#cal .lg-stand{position:absolute;left:24%;width:8%;height:9%;top:calc(3% + 28.4vw * 0);background:linear-gradient(#2a2a2e,#1a1a1d);clip-path:polygon(30% 0,70% 0,100% 100%,0 100%)}
+#cal .lap{left:58%;top:27%;width:32%;aspect-ratio:16/10;border:8px solid #0c0c0e;border-top-width:14px;border-radius:12px 12px 4px 4px}
+#cal .cam{position:absolute;left:calc(58% + 16%);top:calc(27% + 4px);width:6px;height:6px;margin-left:-3px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#3d4d70,#07070c 70%);z-index:3}
+#cal .lap-base{position:absolute;left:55%;width:38%;height:2.2%;border-radius:0 0 12px 12px;background:linear-gradient(#c9ccd3,#9aa0aa)}
+#cal .content{position:absolute;inset:0}
+#cal .dim{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .6s;pointer-events:none;z-index:2}
+#cal .card{position:absolute;left:50%;top:31%;z-index:4;transform:translate(-50%,-44%) scale(.96);opacity:0;transition:opacity .35s,transform .5s cubic-bezier(.3,1.4,.5,1);padding:14px 18px;border-radius:20px;min-width:220px;text-align:center;color:#fff;background:rgba(40,40,48,.42);backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);box-shadow:inset 0 .5px 0 rgba(255,255,255,.6),inset 0 0 0 .5px rgba(255,255,255,.25),0 8px 24px rgba(0,0,0,.3);pointer-events:none}
+#cal .card.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#cal .card b{display:block;font-size:15px;margin-bottom:3px}
+#cal .card span{font-size:12px;opacity:.8}
+#cal .card .ringc{display:block;margin:8px auto 0}
+#cal .drop{position:absolute;left:0;top:0;width:18px;height:18px;border-radius:50%;z-index:6;pointer-events:none;opacity:0;transition:opacity .25s;background:radial-gradient(circle at 34% 30%,#e9fff0 0 14%,#6ee58f 32%,#30d158 55%,#1c8f3f 100%);box-shadow:0 0 14px rgba(48,209,88,.65),0 0 3px rgba(0,0,0,.3),inset 0 -2px 3px rgba(0,60,20,.35)}
+#cal .ring{position:absolute;left:0;top:0;width:44px;height:44px;z-index:5;pointer-events:none;opacity:0;transition:opacity .25s}
+#cal .dock{position:absolute;z-index:7;left:calc(58% + 16%);top:calc(27% + 16px);transform:translateX(-50%);width:46px;height:21px;border-radius:11px;background:rgba(255,255,255,.4);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);box-shadow:inset 0 .5px 0 rgba(255,255,255,.9),inset 0 0 0 .5px rgba(255,255,255,.3),0 4px 12px rgba(0,0,0,.22);overflow:hidden;transition:width .55s cubic-bezier(.3,1.45,.5,1),height .55s cubic-bezier(.3,1.45,.5,1),border-radius .55s cubic-bezier(.3,1.45,.5,1)}
+#cal .dock.x{width:300px;height:150px;border-radius:24px;background:rgba(255,255,255,.76)}
+#cal .dock.xr{width:372px;height:200px;border-radius:26px;background:rgba(255,255,255,.78)}
+#cal .tiles{position:absolute;left:50%;top:4px;transform:translateX(-50%);width:36px;height:13px}
+#cal .tl{position:absolute;border:1.3px solid rgba(28,28,32,.8);border-radius:3px;transition:all .45s cubic-bezier(.3,1.5,.5,1);overflow:hidden}
+#cal .tl i{position:absolute;left:0;right:0;bottom:0;height:0;background:#28a745;transition:height .45s}
+#cal .tl.sel i{height:100%}
+#cal .pnl{position:absolute;left:16px;right:16px;top:24px;bottom:14px;opacity:0;transition:opacity .2s;color:#1c1c1e;font-size:12px;display:none}
+#cal .pnl.show{display:flex;opacity:1}
+#cal .pnl h4{margin:0 0 4px;font-size:14px}
+#cal .pnl p{margin:0;color:rgba(60,60,67,.8);line-height:1.45}
+#cal .pbtns{display:flex;gap:6px;margin-top:10px}
+#cal .pbtns span{padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.07);border:.5px solid rgba(0,0,0,.12);font-weight:500;transition:transform .15s,background .15s}
+#cal .pbtns span.pri{background:#0a84ff;color:#fff;border-color:#0a84ff}
+#cal .pbtns span.press{transform:scale(.92)}
+#cal .meter{height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden;margin:4px 0 2px}
+#cal .meter i{display:block;height:100%;width:0;background:#28a745;border-radius:3px;transition:width .8s cubic-bezier(.3,1.2,.5,1)}
+#cal .mono{font:10.5px ui-monospace,SFMono-Regular,Consolas,monospace;color:rgba(60,60,67,.75);line-height:1.5}
+#cal .notes{margin-top:18px;font-size:13px;line-height:1.55}
+#cal .notes li{margin:3px 0}
+</style>
+
+<div id="cal">
+<h2>Calibration: about 15 seconds, once</h2>
+<p class="subtitle">Press Play. When you look at the LG you can't see the dock, so a water drop leads your eyes across both screens and the instructions appear on whichever screen you should be looking at. Headings (yaw) and angles are illustrative.</p>
+
+<div class="c-bar">
+  <div class="c-grp"><button class="c-btn" id="cPlay">▶ Play</button></div>
+  <div class="c-grp"><span>Guidance</span><button class="c-btn on" data-g="follow">Follow the drop</button><button class="c-btn" data-g="free">Look around freely</button></div>
+  <div class="c-steps"><span class="c-step" data-s="0">1 · Start</span><span class="c-step" data-s="1">2 · LG</span><span class="c-step" data-s="2">3 · Laptop</span><span class="c-step" data-s="3">4 · Result</span></div>
+</div>
+
+<div class="desk" id="cDesk">
+  <div class="scr lg" id="cLG">
+    <div class="content" style="background:#1e1f22">
+      <div style="height:9%;background:#2b2d30"></div>
+      <div style="padding:3% 4%;display:flex;flex-direction:column;gap:7%;height:80%">
+        <b style="width:40%;height:5%;background:#cf8e6d;border-radius:4px;opacity:.8"></b><b style="width:62%;height:5%;background:#56a8f5;border-radius:4px;opacity:.7"></b><b style="width:50%;height:5%;background:#6aab73;border-radius:4px;opacity:.7"></b><b style="width:70%;height:5%;background:#bcbec4;border-radius:4px;opacity:.5"></b><b style="width:34%;height:5%;background:#c77dbb;border-radius:4px;opacity:.7"></b><b style="width:58%;height:5%;background:#bcbec4;border-radius:4px;opacity:.5"></b>
+      </div>
+    </div>
+    <div class="dim" id="cDimLG"></div>
+    <div class="card" id="cCardLG"><b id="cCardLGt">Look at this screen</b><span id="cCardLGs">Follow the drop with your eyes</span></div>
+  </div>
+  <div class="scr lap" id="cLap">
+    <div class="content" style="background:#fff">
+      <div style="height:11%;background:#dfe1e5"></div>
+      <div style="padding:5% 6%;display:grid;grid-template-columns:1.5fr 1fr;gap:6%;height:70%"><div style="display:flex;flex-direction:column;gap:9%"><b style="height:9%;width:60%;background:#202124;border-radius:4px;opacity:.8"></b><b style="height:6%;background:#dadce0;border-radius:4px"></b><b style="height:6%;width:85%;background:#dadce0;border-radius:4px"></b><b style="height:6%;width:70%;background:#dadce0;border-radius:4px"></b></div><div style="border-radius:10px;background:linear-gradient(135deg,#ff8a65,#ba68c8 55%,#4fc3f7)"></div></div>
+    </div>
+    <div class="dim" id="cDimLap"></div>
+    <div class="card" id="cCardLap"><b id="cCardLapt">Now this screen</b><span id="cCardLaps">Follow the drop</span></div>
+  </div>
+  <div class="cam"></div>
+  <div class="lap-base" id="cBase"></div>
+  <div class="dock" id="cDock">
+    <div class="tiles"><div class="tl" id="tLG" style="left:0;top:1px;width:15px;height:9px"><i></i></div><div class="tl sel" id="tLap" style="left:19px;top:2px;width:17px;height:11px"><i></i></div></div>
+    <div class="pnl" id="pIntro"><div>
+      <h4>Calibrate GazeFocus</h4>
+      <p>Sit the way you normally do. Follow the drop with your eyes and turn your head naturally. It takes about 15 seconds.</p>
+      <div class="pbtns"><span class="pri" id="bStart">Start</span><span>Not now</span></div>
+    </div></div>
+    <div class="pnl" id="pResult" style="gap:12px">
+      <svg id="cScatter" viewBox="0 0 160 110" style="width:160px;height:110px;flex:none;border-radius:12px;background:rgba(0,0,0,.05)"></svg>
+      <div style="display:flex;flex-direction:column;min-width:0">
+        <h4>Calibrated ✓</h4>
+        <div class="mono" id="cStats"></div>
+        <div style="font-size:11.5px;margin-top:6px">Separation <b id="cSep">—</b></div>
+        <div class="meter"><i id="cMeter"></i></div>
+        <div style="font-size:11px;color:rgba(60,60,67,.75)">Look at each screen: the water should follow.</div>
+        <div class="pbtns" style="margin-top:auto"><span class="pri">Save</span><span>Redo</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="ring" id="cRing"><svg viewBox="0 0 44 44" width="44" height="44"><circle cx="22" cy="22" r="17" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/><circle id="cRingArc" cx="22" cy="22" r="17" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="106.8" transform="rotate(-90 22 22)"/></svg></div>
+  <div class="drop" id="cDrop"></div>
+</div>
+
+<h3 style="margin-top:22px">Which guidance style?</h3>
+<div class="options">
+  <div class="option" data-choice="follow" onclick="toggleSelect(this);calGuide('follow')">
+    <div class="letter">A</div>
+    <div class="content"><h3>Follow the drop (recommended)</h3><p>A drop tours each screen, lingering briefly in the corners, so your head and eyes cover the whole screen without you having to think about it. It gives the most complete and reliable calibration.</p></div>
+  </div>
+  <div class="option" data-choice="free" onclick="toggleSelect(this);calGuide('free')">
+    <div class="letter">B</div>
+    <div class="content"><h3>Look around freely</h3><p>A card on each screen says "look around this whole screen" with a 4-second countdown ring. Simpler, but people tend to stare at the middle, which gives the calibration less to work with.</p></div>
+  </div>
+</div>
+
+<div class="notes">
+  <b>Rules behind it</b>
+  <ul>
+    <li><b>It never takes focus:</b> the overlays and cards are click-through, like the dock. <b>Esc</b> cancels at any time; the Raw Input watcher sees the key without capturing it.</li>
+    <li><b>It only counts what it can see:</b> samples are recorded only while your face is detected. If it loses you, the drop waits and the card says <i>"Can't see you. Is the room too dark?"</i></li>
+    <li><b>An honest result:</b> the separation figure measures how far apart your two looking positions are compared with how much they wobble. Below 2σ it says <i>"Too close. Turn your head a little more, or move the LG closer to the laptop."</i> and offers Redo.</li>
+    <li><b>Saved per monitor layout:</b> it's stored with the monitors' IDs and positions. If you move, add or remove a monitor, the dock shows a small "!" and asks you to recalibrate. It never keeps running on a stale calibration.</li>
+  </ul>
+</div>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const desk=$('cDesk'),LG=$('cLG'),LAP=$('cLap'),drop=$('cDrop'),ring=$('cRing'),arc=$('cRingArc'),dock=$('cDock');
+let gen=0,guide='follow';
+class Cancel extends Error{}
+const sleep=(ms,g)=>new Promise((res,rej)=>setTimeout(()=>g===gen?res():rej(new Cancel()),ms));
+function animate(dur,fn,g){return new Promise((res,rej)=>{const t0=performance.now();function f(now){if(g!==gen)return rej(new Cancel());const p=Math.max(0,Math.min(1,(now-t0)/dur));fn(p);if(p<1)requestAnimationFrame(f);else res();}requestAnimationFrame(f);});}
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function rectIn(el){const d=desk.getBoundingClientRect(),r=el.getBoundingClientRect();return{x:r.left-d.left,y:r.top-d.top,w:r.width,h:r.height};}
+function inner(el){const r=rectIn(el);const cs=getComputedStyle(el);const bl=parseFloat(cs.borderLeftWidth),bt=parseFloat(cs.borderTopWidth),br=parseFloat(cs.borderRightWidth),bb=parseFloat(cs.borderBottomWidth);return{x:r.x+bl,y:r.y+bt,w:r.w-bl-br,h:r.h-bt-bb};}
+function pt(el,u,v){const r=inner(el);return{x:r.x+u*r.w,y:r.y+v*r.h};}
+function dockPt(){const r=rectIn(dock);return{x:r.x+r.w/2+7,y:r.y+r.h/2};}
+let last=null;
+function place(p,showRing){const dx=last?p.x-last.x:0,dy=last?p.y-last.y:0;const v=Math.hypot(dx,dy);const st=Math.min(0.55,v*0.05);const ang=Math.atan2(dy,dx)*180/Math.PI;
+  drop.style.transform='translate('+(p.x-9)+'px,'+(p.y-9)+'px) rotate('+ang+'deg) scale('+(1+st)+','+(1-st*0.55)+')';
+  ring.style.transform='translate('+(p.x-22)+'px,'+(p.y-22)+'px)';last=p;}
+function cr(a,b,c,d,t){const t2=t*t,t3=t2*t;const f=(p0,p1,p2,p3)=>.5*(2*p1+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);return{x:f(a.x,b.x,c.x,d.x),y:f(a.y,b.y,c.y,d.y)};}
+function spline(P,t){const n=P.length-1;const s=Math.min(n-1e-6,t*n);const i=Math.floor(s),fr=eio(s-i);return cr(P[Math.max(0,i-1)],P[i],P[i+1],P[Math.min(n,i+2)],fr);}
+function bez(a,c,b,t){const u=1-t;return{x:u*u*a.x+2*u*t*c.x+t*t*b.x,y:u*u*a.y+2*u*t*c.y+t*t*b.y};}
+async function travel(to,dur,g){const from=last||dockPt();const c={x:(from.x+to.x)/2,y:Math.min(from.y,to.y)-60};await animate(dur,p=>place(bez(from,c,to,eio(p))),g);}
+const TOUR={lg:[[.5,.5],[.1,.14],[.9,.14],[.9,.86],[.1,.86],[.5,.5]],laptop:[[.5,.5],[.12,.24],[.88,.24],[.88,.86],[.12,.86],[.5,.5]]};
+const CL={lg:{yaw:-34,sy:22,pitch:7,sp:12,c:'#0a84ff'},laptop:{yaw:-3,sy:16,pitch:-8,sp:10,c:'#bf5af2'}};
+let samples=[];
+function sample(k,u,v){const c=CL[k];const n=()=>(Math.random()+Math.random()+Math.random()-1.5)*2.2;samples.push({k,yaw:c.yaw+(u-.5)*c.sy+n(),pitch:c.pitch-(v-.5)*c.sp+n()});}
+async function tour(el,k,g){const P=TOUR[k].map(q=>pt(el,q[0],q[1]));let lastS=0;ring.style.opacity=1;
+  await animate(5200,p=>{const q=spline(P,p);place(q);arc.setAttribute('stroke-dashoffset',(106.8*(1-p)).toFixed(1));const r=inner(el);if(performance.now()-lastS>70){lastS=performance.now();sample(k,(q.x-r.x)/r.w,(q.y-r.y)/r.h);}},g);
+  ring.style.opacity=0;}
+async function freeLook(el,k,card,sub,g){const t0=performance.now();let lastS=0;
+  $(sub).innerHTML='Look around this whole screen, corners too<svg class="ringc" viewBox="0 0 44 44" width="34" height="34"><circle cx="22" cy="22" r="17" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="3"/><circle id="fr'+k+'" cx="22" cy="22" r="17" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="106.8" transform="rotate(-90 22 22)"/></svg>';
+  await animate(4000,p=>{const a=$('fr'+k);if(a)a.setAttribute('stroke-dashoffset',(106.8*(1-p)).toFixed(1));if(performance.now()-lastS>70){lastS=performance.now();const u=.5+(Math.random()-.5)*.55,v=.5+(Math.random()-.5)*.45;sample(k,u,v);}},g);}
+function steps(i){document.querySelectorAll('#cal .c-step').forEach(s=>s.classList.toggle('on',+s.dataset.s===i));}
+function tiles(sel){const lg=$('tLG'),lp=$('tLap');
+  if(sel==='lg'){lg.style.cssText='left:0;top:0;width:17px;height:11px';lp.style.cssText='left:21px;top:3px;width:15px;height:9px';}
+  else if(sel==='laptop'){lg.style.cssText='left:0;top:1px;width:15px;height:9px';lp.style.cssText='left:19px;top:2px;width:17px;height:11px';}
+  else{lg.style.cssText='left:1px;top:1px;width:16px;height:10px';lp.style.cssText='left:20px;top:3px;width:16px;height:10px';}
+  lg.classList.toggle('sel',sel==='lg');lp.classList.toggle('sel',sel==='laptop');}
+function dim(lg,lap){$('cDimLG').style.background='rgba(0,0,0,'+lg+')';$('cDimLap').style.background='rgba(0,0,0,'+lap+')';}
+function scatter(){const s=$('cScatter');while(s.firstChild)s.removeChild(s.firstChild);const NS='http://www.w3.org/2000/svg';const mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);s.appendChild(e);return e;};
+  const X=y=>8+(y+58)/(20+58)*144,Y=p=>102-(p+22)/44*94;
+  mk('line',{x1:8,x2:152,y1:Y(0),y2:Y(0),stroke:'rgba(0,0,0,.12)','stroke-width':.6});mk('line',{x1:X(0),x2:X(0),y1:8,y2:102,stroke:'rgba(0,0,0,.12)','stroke-width':.6});
+  const m={lg:{x:0,y:0,n:0},laptop:{x:0,y:0,n:0}};for(const q of samples){m[q.k].x+=q.yaw;m[q.k].y+=q.pitch;m[q.k].n++;}for(const k in m){m[k].x/=m[k].n||1;m[k].y/=m[k].n||1;}
+  const mx=(m.lg.x+m.laptop.x)/2,my=(m.lg.y+m.laptop.y)/2,dx=m.laptop.x-m.lg.x,dy=m.laptop.y-m.lg.y;const nx=-dy,ny=dx;const L=60;
+  mk('line',{x1:X(mx-nx/Math.hypot(nx,ny)*L),y1:Y(my-ny/Math.hypot(nx,ny)*L),x2:X(mx+nx/Math.hypot(nx,ny)*L),y2:Y(my+ny/Math.hypot(nx,ny)*L),stroke:'rgba(0,0,0,.45)','stroke-width':.8,'stroke-dasharray':'3 2'});
+  samples.forEach((q,i)=>{const c=mk('circle',{cx:X(q.yaw).toFixed(1),cy:Y(q.pitch).toFixed(1),r:1.6,fill:CL[q.k].c,opacity:0});setTimeout(()=>c.setAttribute('opacity',.75),i*6);});
+  const lab=(t,x,y)=>{const e=mk('text',{x,y,'font-size':8,'font-weight':600,fill:'rgba(28,28,32,.8)','font-family':'system-ui'});e.textContent=t;};
+  lab('LG',X(m.lg.x)-40,Y(m.lg.y)+3);lab('Laptop',X(m.laptop.x)+20,Y(m.laptop.y)+3);
+  let v=0,n=0;for(const q of samples){const c=m[q.k];v+=(q.yaw-c.x)**2+(q.pitch-c.y)**2;n++;}const sd=Math.sqrt(v/Math.max(1,n)/2);const sep=Math.hypot(dx,dy)/sd;
+  $('cSep').textContent=sep.toFixed(1)+'σ · '+(sep>4?'excellent':sep>2?'good':'too close');setTimeout(()=>{$('cMeter').style.width=Math.min(100,sep/8*100)+'%';},200);
+  const fm=v=>(v>0?'+':v<0?'−':'')+Math.abs(Math.round(v))+'°';$('cStats').innerHTML='yaw / pitch<br>LG&nbsp;&nbsp;&nbsp;&nbsp; '+fm(m.lg.x)+' / '+fm(m.lg.y)+'<br>Laptop '+fm(m.laptop.x)+' / '+fm(m.laptop.y);}
+function reset(){samples=[];last=null;drop.style.opacity=0;ring.style.opacity=0;dock.className='dock';$('pIntro').classList.remove('show');$('pResult').classList.remove('show');$('cMeter').style.width='0';$('bStart').classList.remove('press');
+  ['cCardLG','cCardLap'].forEach(c=>$(c).classList.remove('show'));$('cCardLGs').textContent='Follow the drop with your eyes';$('cCardLaps').textContent='Follow the drop';dim(0,0);tiles('laptop');steps(-1);}
+async function play(){const g=++gen;reset();
+  try{
+    await sleep(300,g);steps(0);dock.classList.add('x');await sleep(250,g);$('pIntro').classList.add('show');
+    await sleep(2200,g);$('bStart').classList.add('press');await sleep(180,g);$('bStart').classList.remove('press');
+    $('pIntro').classList.remove('show');dock.className='dock';tiles(null);await sleep(420,g);
+    steps(1);dim(.25,.62);
+    if(guide==='follow'){last=dockPt();place(last);drop.style.opacity=1;await travel(pt(LG,.5,.5),1100,g);
+      $('cCardLG').classList.add('show');await sleep(1300,g);$('cCardLG').classList.remove('show');await tour(LG,'lg',g);}
+    else{$('cCardLGt').textContent='Look at this screen';$('cCardLG').classList.add('show');await sleep(400,g);await freeLook(LG,'lg','cCardLG','cCardLGs',g);$('cCardLG').classList.remove('show');}
+    steps(2);dim(.62,.25);
+    if(guide==='follow'){await travel(pt(LAP,.5,.55),1100,g);$('cCardLap').classList.add('show');await sleep(1200,g);$('cCardLap').classList.remove('show');await tour(LAP,'laptop',g);
+      await travel(dockPt(),700,g);drop.style.opacity=0;}
+    else{$('cCardLap').classList.add('show');await sleep(400,g);await freeLook(LAP,'laptop','cCardLap','cCardLaps',g);$('cCardLap').classList.remove('show');}
+    dim(0,0);steps(3);tiles('laptop');await sleep(200,g);dock.classList.add('xr');await sleep(300,g);$('pResult').classList.add('show');scatter();
+  }catch(e){if(!(e instanceof Cancel))console.error(e);}
+}
+$('cPlay').addEventListener('click',play);
+document.querySelectorAll('#cal [data-g]').forEach(b=>b.addEventListener('click',()=>calGuide(b.dataset.g)));
+window.calGuide=g=>{guide=g;document.querySelectorAll('#cal [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===g));play();};
+function layout(){const d=desk.getBoundingClientRect();const lg=rectIn(LG);$('cBase').style.top=(rectIn(LAP).y+rectIn(LAP).h)+'px';}
+window.addEventListener('resize',layout);layout();
+setTimeout(play,600);
+})();
+</script>
+
+</body></html>
