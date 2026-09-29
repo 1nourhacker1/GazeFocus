@@ -40,3 +40,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/storage.py](reference/gazefocus/storage.md)
 - [gazefocus/replay.py](reference/gazefocus/replay.md)
 - [gazefocus/runtime.py](reference/gazefocus/runtime.md)
+- [gazefocus/__main__.py](reference/gazefocus/__main__.md)
