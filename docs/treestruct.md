@@ -34,3 +34,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [M0-A: tracking](spikes/m0a-tracking.md)
 - [M0-C: glass pill dock](spikes/m0c-glass-dock.md)
 - [gazefocus/config.py](reference/gazefocus/config.md)
+- [gazefocus/logic/classifier.py](reference/gazefocus/logic/classifier.md)
