@@ -55,3 +55,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/app/controller.py](reference/gazefocus/app/controller.md)
 - [gazefocus/calibration.py](reference/gazefocus/calibration.md)
 - [gazefocus/cues.py](reference/gazefocus/cues.md)
+- [gazefocus/app/workers.py](reference/gazefocus/app/workers.md)
