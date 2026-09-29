@@ -68,3 +68,44 @@ def test_live_camera_busy(monkeypatch, capsys):
     monkeypatch.setattr(camera_usage, "apps_using_camera", lambda entries=None, exclude=(): [])
     assert main(["live"]) == 2
     assert "Could not open the camera" in capsys.readouterr().err
+
+
+# --- final review (Minor #10, re-graded Important): a bad calibration must not replace a good one ---
+from types import SimpleNamespace
+
+import gazefocus.__main__ as cli
+
+CLOSE = ZoneModel(w=(0.1, 0.0, 0.0), b=0.0, separation=1.2, mean_lg=(5, 8, 0), mean_laptop=(0, 8, 0), sd=(4.0, 4.0, 0.1))
+GOOD = ZoneModel(w=(-0.07, 0.0, 0.0), b=0.9, separation=12.0, mean_lg=(28, 3, 0.2), mean_laptop=(-1, 9, 0), sd=(2.0, 1.0, 0.1))
+
+
+def fake_calibration_run(monkeypatch, model):
+    cam = SimpleNamespace(backend="MSMF", read=lambda: None, release=lambda: None)
+    monkeypatch.setattr(cli, "_open_camera", lambda cfg: cam)
+    monkeypatch.setattr(cli, "_tracker", lambda: SimpleNamespace(process=None, close=lambda: None))
+    monkeypatch.setattr("gazefocus.runtime.calibrate", lambda *a, **k: (model, {"LG": 60, "LAPTOP": 60}))
+
+
+def test_too_close_calibration_keeps_the_previous_one(monkeypatch, capsys):
+    save_toy_calibration()
+    before = calibration_path().read_text(encoding="utf-8")
+    fake_calibration_run(monkeypatch, CLOSE)
+    assert main(["calibrate-cli"]) == 3
+    assert calibration_path().read_text(encoding="utf-8") == before
+    err = capsys.readouterr().err
+    assert "too close" in err and "--force" in err
+
+
+def test_force_saves_and_backs_up_the_previous(monkeypatch):
+    save_toy_calibration()
+    before = calibration_path().read_text(encoding="utf-8")
+    fake_calibration_run(monkeypatch, CLOSE)
+    assert main(["calibrate-cli", "--force"]) == 0
+    assert calibration_path().with_name("calibration.prev.json").read_text(encoding="utf-8") == before
+    assert '"separation": 1.2' in calibration_path().read_text(encoding="utf-8")
+
+
+def test_good_calibration_is_saved(monkeypatch):
+    fake_calibration_run(monkeypatch, GOOD)
+    assert main(["calibrate-cli"]) == 0
+    assert '"separation": 12.0' in calibration_path().read_text(encoding="utf-8")

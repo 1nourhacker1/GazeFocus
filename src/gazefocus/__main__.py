@@ -66,6 +66,9 @@ def cmd_live(args) -> int:
 
 
 def cmd_calibrate(args) -> int:
+    import shutil
+
+    from gazefocus.logic.classifier import quality
     from gazefocus.runtime import calibrate
     from gazefocus.storage import Calibration, calibration_path, now_iso, save_calibration
     from gazefocus.win.monitors import enumerate_monitors, layout_fingerprint, zone_monitors
@@ -97,8 +100,19 @@ def cmd_calibrate(args) -> int:
         model=model,
         samples=counts,
     )
-    save_calibration(cal, calibration_path())
-    print(f"saved {calibration_path()} (mean yaw LG {model.mean_lg[0]:+.1f}, laptop {model.mean_laptop[0]:+.1f})")
+    if quality(model.separation) == "too close" and not args.force:
+        print(
+            f"calibration too close ({model.separation:.1f} sigma): turn your head a little more toward each "
+            "screen, or move the LG closer to the laptop. The previous calibration was kept; "
+            "rerun with --force to save this one anyway.",
+            file=sys.stderr,
+        )
+        return EXIT_CALIBRATION
+    path = calibration_path()
+    if path.exists():
+        shutil.copyfile(path, path.with_name("calibration.prev.json"))
+    save_calibration(cal, path)
+    print(f"saved {path} (mean yaw LG {model.mean_lg[0]:+.1f}, laptop {model.mean_laptop[0]:+.1f})")
     return EXIT_OK
 
 
@@ -186,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("live", help="live mirrored camera view with the head-pose overlay").set_defaults(fn=cmd_live)
     c = sub.add_parser("calibrate-cli", help="terminal calibration: LG, then laptop")
     c.add_argument("--seconds", type=float, default=6.0)
+    c.add_argument("--force", action="store_true", help="save even a 'too close' calibration")
     c.set_defaults(fn=cmd_calibrate)
     w = sub.add_parser("watch", help="dry run: which screen you look at, and what GazeFocus would do")
     w.add_argument("--record", metavar="FILE")
