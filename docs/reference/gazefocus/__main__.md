@@ -1,5 +1,5 @@
 # gazefocus/__main__.py
-Verified against: GazeFocus@0b9e2a5 · 2026-09-29
+Verified against: GazeFocus@7fdf407 · 2026-09-29
 
 The console script is `gazefocus` (from `[project.scripts]`). Every command loads `config.toml` first, writing the defaults if it's missing, and prints any config warnings to stderr.
 
@@ -20,3 +20,4 @@ The console script is `gazefocus` (from `[project.scripts]`). Every command load
 - `watch` is a dry run, with simulated focus and no input data. Ctrl+C stops it cleanly.
 - In **cmd**, write recording paths as `"%APPDATA%\GazeFocus\recordings\x.jsonl"`. A bash-style `$APPDATA` creates a literal `$APPDATA` folder in the current directory; this happened once during the desk session.
 - `main()` calls `configure_console()` so window titles with characters outside the console code page print as `?` instead of crashing.
+- `calibrate-cli` saves through `calibration.commit_calibration` (too-close guard, `.prev` backup, raw samples).

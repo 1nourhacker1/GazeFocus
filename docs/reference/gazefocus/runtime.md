@@ -1,5 +1,5 @@
 # gazefocus/runtime.py
-Verified against: GazeFocus@a83011d · 2026-09-29
+Verified against: GazeFocus@7fdf407 · 2026-09-29
 
 Camera-driven loops used by the CLI. Every loop takes `read_frame`, `track`, `clock`, `sleep` and `say`, so the tests run on a fake clock. The default clock is `time.perf_counter` (`time.monotonic` ticks every 15.6 ms on Windows).
 
@@ -14,3 +14,4 @@ Camera-driven loops used by the CLI. Every loop takes `read_frame`, `track`, `cl
 - `bench_loop` prints a `BenchReport.line()` every `report_every` seconds and returns the whole-run report.
   - CPU % is process CPU time ÷ wall time ÷ cores; RSS comes from psutil.
   - `verdict()` checks the spec targets: **CPU ≤ 2 %** and **RSS ≤ 300 MB**.
+- `calibrate(samples_out=dict)` fills in the raw per-phase samples. `lead_in_s` (default 2) is the pause after each cue.
