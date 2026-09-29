@@ -1,5 +1,5 @@
 # gazefocus/logic/classifier.py
-Verified against: GazeFocus@9a6a614 · 2026-09-29
+Verified against: GazeFocus@a83011d · 2026-09-29
 
 **Features:** `yaw`, `pitch`, `iris_h`. `iris_v` was dropped because eyelid position follows pitch.
 

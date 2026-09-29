@@ -1,5 +1,5 @@
 # gazefocus/runtime.py
-Verified against: GazeFocus@90c2edd · 2026-09-29
+Verified against: GazeFocus@a83011d · 2026-09-29
 
 Camera-driven loops used by the CLI. Every loop takes `read_frame`, `track`, `clock`, `sleep` and `say`, so the tests run on a fake clock. The default clock is `time.perf_counter` (`time.monotonic` ticks every 15.6 ms on Windows).
 

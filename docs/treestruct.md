@@ -7,7 +7,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 
 | Area | Status | Verified against |
 |---|---|---|
-| `superpowers/specs/` | **Design, not code-verified.** No source exists yet. | — |
+| `superpowers/specs/` | Design. §6, §7.4, §8.5, §10 and §15 were amended on 2026-09-29 after Plan 1's spikes and desk session; the rest is still unverified until Plans 2 and 3 | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
 | `reference/gazefocus/` | Code-verified per file (see each `Verified against`) | per file |
 | `spikes/` | Hardware spike results, pasted from real runs | per file |

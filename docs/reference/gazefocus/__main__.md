@@ -1,5 +1,5 @@
 # gazefocus/__main__.py
-Verified against: GazeFocus@9a6a614 · 2026-09-29
+Verified against: GazeFocus@a83011d · 2026-09-29
 
 The console script is `gazefocus` (from `[project.scripts]`). Every command loads `config.toml` first, writing the defaults if it's missing, and prints any config warnings to stderr.
 
@@ -7,7 +7,7 @@ The console script is `gazefocus` (from `[project.scripts]`). Every command load
 |---|---|---|
 | `probe` | camera | 0, 2 |
 | `live` | camera (opens a mirrored preview window; q quits) | 0, 2 |
-| `calibrate-cli [--seconds 6]` | camera | 0, 2, 3 (too few samples or indistinguishable screens) |
+| `calibrate-cli [--seconds 6] [--force]` | camera | 0, 2, 3 (too few samples, indistinguishable screens, or **too close**: the previous calibration is kept unless `--force`; a replaced one is saved as `calibration.prev.json`) |
 | `watch [--record FILE] [--seconds S]` | a calibration matching the **current** monitor layout, and the camera | 0, 2, 3 |
 | `bench [--minutes 10]` | camera | 0, 2 |
 | `replay FILE` | any calibration (no layout check) | 0, 1 (bad file), 3 |

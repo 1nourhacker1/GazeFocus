@@ -126,7 +126,7 @@ A single Python 3.12 process (uv-managed) with two threads:
 | `vision.camera.CameraSource` | Opens the camera (OpenCV MSMF), 640×480, yields frames at the configured FPS; release and reopen | OpenCV | no |
 | `vision.pose` | 4×4 face transform → yaw/pitch; landmarks → iris offsets | numpy | **yes** |
 | `vision.tracker.HeadTracker` | MediaPipe FaceLandmarker in `VIDEO` mode → `HeadSample` | mediapipe, `pose` | no |
-| `logic.classifier.ZoneClassifier` | Fits the calibration (LDA); turns a sample into (zone, margin); separation score | numpy | **yes** |
+| `logic.classifier.ZoneClassifier` | Fits the calibration (diagonal discriminant, §6); turns a sample into (zone, margin); outlier gate; separation score | numpy | **yes** |
 | `logic.decider.GazeDecider` | The §4.1 state machine: takes samples, input times, foreground events and a clock, emits `Decision`s | none | **yes** |
 | `win.rawinput.InputWatcher` | Last key time, last mouse-move time, buttons held, last cursor position per monitor; ignores **injected** input (`hDevice == 0`) | ctypes | no |
 | `win.foreground.ForegroundTracker` | WinEvent hook, MRU per monitor, flags manual versus our own focus changes | ctypes | no |
@@ -145,7 +145,7 @@ A single Python 3.12 process (uv-managed) with two threads:
 class HeadSample:          # one per processed frame
     t: float               # monotonic seconds
     face: bool
-    yaw: float; pitch: float        # degrees; yaw < 0 = the user turns to their left (sign fixed in M0)
+    yaw: float; pitch: float        # degrees; yaw > 0 = turned toward the LG, i.e. the user's left (M0-A)
     iris_h: float; iris_v: float    # −1..1 within the eye opening
 
 class Zone(Enum): LAPTOP, LG, UNKNOWN   # internally keyed by monitor ID, not by name
@@ -160,25 +160,33 @@ class Decision:
 
 ## 6. Signal processing
 
+> **Revised 2026-09-29 (Plan 1 desk session).** The first real calibration showed that the full-covariance, four-feature LDA originally written here weighted pitch *against* its own mean difference, by exploiting the pitch↔eyelid correlation. Looking down at the laptop then read as the LG. What follows is the design that replaced it; the evidence is in `docs/spikes/plan1-desk-session.md`.
+
 ### 6.1 Features
 - From MediaPipe (`num_faces=1`, facial transformation matrices on, blendshapes off, confidence thresholds 0.5):
-  - **yaw and pitch** from the rotation part of the 4×4 matrix
-  - **iris_h and iris_v**: the iris centres (landmarks 468 and 473) relative to the eye corners (33/133, 362/263) and the lids (159/145, 386/374), averaged across both eyes
-- Feature vector: `f = (yaw, pitch, iris_h, iris_v)`.
+  - **yaw and pitch** from the rotation part of the 4×4 matrix. Turning toward the LG makes yaw **positive** (M0-A).
+  - **iris_h**: the iris centres (landmarks 468 and 473) relative to the eye corners (33/133, 362/263), averaged across both eyes.
+  - `iris_v`, the position between the lids, is still computed, but **it isn't used**: eyelid position follows pitch.
+- Feature vector: `f = (yaw, pitch, iris_h)`.
 
 ### 6.2 Calibration fit
-- **Linear discriminant (LDA)** with a shared covariance over the two screens' samples. This yields `w, b`.
+- **Trim turn frames:** per screen, drop any sample more than 3 MAD from the median yaw. The first 1.0 s of each phase is discarded as well.
+- **Diagonal linear discriminant:** per-screen means plus a *diagonal* pooled variance (floors of 1°, 1° and 0.05). Each weight is `Δμ/σ²`, so it always has the sign of its own mean difference, and yaw dominates in practice.
 - Projections are scaled so the LG's mean sits at **z = −1** and the laptop's mean at **z = +1**.
-- Pitch and iris are weighted automatically by how much they help separate the two screens.
-- **Separation score** = |μ_LG − μ_laptop| / pooled σ along `w` (the Fisher criterion), shown as "Nσ":
+- **Separation score** = the diagonal Mahalanobis distance between the screen means, shown as "Nσ":
   - **4σ or more:** excellent
   - **2σ to 4σ:** good
-  - **under 2σ:** too close. The message is "turn your head a little more, or move the LG closer". Save is still allowed, with a warning.
+  - **under 2σ:** too close. The message is "turn your head a little more, or move the LG closer". The **previous calibration is kept** unless `--force` is given; a replaced one is saved as `calibration.prev.json`.
+- The model stores the pooled `sd` per feature, for the outlier gate below.
 
 ### 6.3 Per-frame classification
-- `z = w·f + b`, smoothed with an **exponential moving average (EMA), α = 0.35** (about 150 ms at 15 FPS). The result is the margin.
+- **Outlier gate:** if pitch or iris_h is more than `ood_sigma` (3.5) sd from **both** screens (for example looking down at a phone), the result is UNKNOWN and the frame isn't used.
+  - The gate uses a minimum sd of 4° for pitch and 0.15 for iris_h.
+  - iris_h isn't gated when the head is already turned past the LG.
+  - Yaw is never gated.
+- `z = w·f + b`, smoothed with an **exponential moving average (EMA), α = 0.35** (about 150 ms at 15 FPS). The result is the margin. The EMA restarts after a gated stretch or a face loss.
 - **z ≤ −0.25** is LG, **z ≥ +0.25** is LAPTOP, and anything between is UNKNOWN (a dead band, which is the hysteresis).
-- Face lost: see §4.4.
+- Face lost: see §4.4. The 300 ms memory counts from the last frame that produced a **valid** margin, not a gated one.
 
 ## 7. Windows integration
 
@@ -209,6 +217,10 @@ class Decision:
 - **Camera in use:** when opening fails, check
   `HKCU\…\CapabilityAccessManager\ConsentStore\webcam\**\LastUsedTimeStop == 0` for another app. If another app has it,
   show the "camera off" state and retry every 5 s.
+  **M0-D result (2026-09-29):**
+  - The webcam is **exclusive**. The Windows Camera app fails while GazeFocus holds it.
+  - A failed attempt by another app leaves **no** ConsentStore trace, so this check only covers the reverse case.
+  - Plan 2 must hand the camera over explicitly: the manual pause, and possibly a call-app heuristic. See `docs/spikes/m0d-camera-sharing.md`.
 - **Single instance:** named mutex `Local\GazeFocus`. A second launch exits.
 
 ## 8. The dock
@@ -266,6 +278,11 @@ class Decision:
 - **Acrylic behind a pill shape:** `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW)` plus a window region.
   The fallback is `SetWindowCompositionAttribute(ACCENT_ENABLE_ACRYLICBLURBEHIND)`. The final fallback is a frosted fill with no real blur.
   **Which one works is decided by spike M0-C.**
+  **M0-C result (2026-09-29): none of them.**
+  - Qt makes translucent windows layered, so DWM and accent blur never show, and `SetWindowRgn` gives boxy edges.
+  - The focus handling and the ~60 fps resize animation both passed.
+  - Plan 3 starts with spike **M0-C2**: capture the small area behind the dock ourselves (excluded from capture), then blur and refract it in a Qt Quick shader. This also makes Apple-style refraction possible. The fallback is a WebView with system acrylic.
+  - See `docs/spikes/m0c-glass-dock.md`.
 - **Expanding:** the window is sized to the panel's maximum size, the pill is drawn inside it, and the region or hit-test
   follows the animated shape (mouse clicks outside the pill fall through to the windows underneath).
 - **GPU cost:** Qt Quick renders on the GPU only while an animation runs. When idle there are zero frames.
@@ -321,7 +338,8 @@ class Decision:
 | `hotkey.pause` | `"Ctrl+Alt+G"` |
 
 - **`calibration.json`:** `version`, `created`, and `layout` (a fingerprint plus each monitor's device name, ID, rectangle and primary flag).
-  Also `camera` (name and resolution), per-screen `{mean, cov, n}`, the LDA `{w, b, scale}` and `separation`.
+  Also `camera` (name and resolution), the model `{w, b, separation, mean_lg, mean_laptop, sd}` and per-screen sample counts.
+  This is **version 2** (2026-09-29); version 1 files are refused with "please recalibrate". A replaced calibration is kept as `calibration.prev.json`.
   It's loaded only if the layout fingerprint matches the current monitors.
 - **`logs/gazefocus.log`** (rotating, 5 × 1 MB) and **`logs/decisions.log`**: one line per `Decision`, with action `switch`, `blocked` or `FAIL`.
 - **Model:** `models/face_landmarker.task` in the repo folder (gitignored). `scripts/fetch_model.py` downloads it and verifies a pinned SHA-256.
@@ -431,3 +449,6 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Accessibility fallbacks | None; always full motion and glass (user's choice) | Honour the Windows settings |
 | Calibration guidance | Follow the drop | Look around freely |
 | Project location | `C:\work\GazeFocus` | none |
+| Classifier (desk session, after Plan 1) | Diagonal discriminant on yaw, pitch, iris_h; turn-frame trim; outlier gate; v2 calibration file | Full-covariance LDA on four features (weighted pitch against its own mean difference on real data) |
+| Live view (user request) | `gazefocus live`, a mirrored preview with the head-pose overlay | none |
+| Calibration cues | The program beeps (450 ms): 1 = LG, 2 = laptop, 3 = done | Typed cues from the assistant (arrived seconds late) |
