@@ -158,3 +158,31 @@ def test_outlier_gate_has_a_realistic_minimum_spread():
     assert not tight.is_outlier([0.0, 7 + 8.0, 0.0], 3.5)  # 8 deg below the laptop mean: still the laptop
     assert not tight.is_outlier([0.0, 7.0, 0.3], 3.5)  # eyes a little to the side
     assert tight.is_outlier([0.0, 7 + 21.0, 0.0], 3.5)  # leaning down to a phone
+
+
+# --- final-review fixes: the face-lost latch and the outlier gate (review Important #1, #2) ---
+
+def lean(t):  # face present, looking far down at a phone: pitch 10 + 5 sd*5 = 35 (TOY pitch sd 5 -> floor 4 -> 5)
+    return HeadSample(t=t, face=True, yaw=0.0, pitch=35.0)
+
+
+def test_phone_lean_after_a_hard_lg_margin_does_not_latch_lg():
+    c = ZoneClassifier(TOY, ClassifierCfg())
+    c.update(s(0.0, -45))  # z = -2.0, a hard LG margin
+    for i in range(1, 30):  # 2 s of gated "neither screen" frames
+        assert c.update(lean(i / 15))[0] is Zone.UNKNOWN
+    assert c.update(s(2.1)) == (Zone.UNKNOWN, None)  # face lost: the last *valid* margin is 2 s old
+
+
+def test_high_yaw_with_eyes_to_the_same_side_stays_lg():
+    c = ZoneClassifier(TOY, ClassifierCfg())
+    far = HeadSample(t=0.0, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8)  # 8 sd of iris_h, but past the LG
+    assert c.update(far)[0] is Zone.LG
+
+
+def test_face_loss_right_after_a_past_the_lg_turn_latches_lg():
+    c = ZoneClassifier(TOY, ClassifierCfg())
+    for i in range(5):
+        c.update(HeadSample(t=i / 15, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8))
+    zone, m = c.update(s(5 / 15 + 0.1))
+    assert zone is Zone.LG and m is not None and m <= -1.2

@@ -45,9 +45,15 @@ class ZoneModel:
         return float(np.dot(self.w, f) + self.b)
 
     def is_outlier(self, f, sigma: float) -> bool:
-        """True when pitch or iris_h is more than `sigma` sd from BOTH screens (e.g. looking at a phone)."""
+        """True when pitch or iris_h is more than `sigma` sd from BOTH screens (e.g. looking at a phone).
+
+        iris_h is not gated once the head is turned past the LG: the eyes lead a big head turn,
+        so extreme iris offsets there still mean "LG" (review finding, second desk recording).
+        """
         f, sd = np.asarray(f, dtype=float), np.maximum(np.asarray(self.sd), OOD_SD_FLOOR)
-        idx = list(_OOD_FEATURES)
+        lg_side = np.sign(self.mean_lg[0] - self.mean_laptop[0])
+        past_lg = (f[0] - self.mean_lg[0]) * lg_side > 0
+        idx = [1] if past_lg else list(_OOD_FEATURES)
         far = [np.max(np.abs(f[idx] - np.asarray(mean)[idx]) / sd[idx]) for mean in (self.mean_lg, self.mean_laptop)]
         return min(far) > sigma
 
@@ -129,7 +135,7 @@ class ZoneClassifier:
 
     def reset(self) -> None:
         self._m: float | None = None
-        self._last_face_t: float | None = None
+        self._last_valid_t: float | None = None  # last frame that produced a margin (not gated, face present)
         self._lost = False
         self._latched_lg = False
         self._restart = False  # set on face loss: the EMA restarts from the next face frame
@@ -144,17 +150,18 @@ class ZoneClassifier:
     def update(self, s: HeadSample) -> tuple[Zone, float | None]:
         if s.face:
             f = features(s)
-            self._lost, self._latched_lg, self._last_face_t = False, False, s.t
+            self._lost, self._latched_lg = False, False
             if self.model.is_outlier(f, self.cfg.ood_sigma):
-                return Zone.UNKNOWN, None  # looking at neither screen; keep it out of the EMA
+                self._restart = True  # after looking at neither screen, start the EMA fresh
+                return Zone.UNKNOWN, None  # keep it out of the EMA and out of the face-lost memory
             z = self.model.z(f)
             self._m = z if self._m is None or self._restart else self._m + self.cfg.ema_alpha * (z - self._m)
-            self._restart = False
+            self._restart, self._last_valid_t = False, s.t
             return self._zone(self._m), self._m
         if not self._lost:
             self._lost = True
             self._restart = True
-            recent = self._last_face_t is not None and s.t - self._last_face_t <= self.cfg.face_lost_memory_s
+            recent = self._last_valid_t is not None and s.t - self._last_valid_t <= self.cfg.face_lost_memory_s
             self._latched_lg = bool(recent and self._m is not None and self._m <= self.cfg.face_lost_lg_margin)
         if self._latched_lg:
             return Zone.LG, self._m
