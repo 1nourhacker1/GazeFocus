@@ -41,8 +41,9 @@ def _beep(name: str) -> None:
     """1 beep = look at the LG, 2 = look at the laptop, 3 = done."""
     import winsound
 
+    # 450 ms: idle laptop audio needs ~200-300 ms to wake, so short tones get swallowed (desk session)
     for _ in range(BEEPS.get(name, 0)):
-        winsound.Beep(1046 if name == "DONE" else 880, 160)
+        winsound.Beep(1046 if name == "DONE" else 880, 450)
 
 
 def _tracker():
