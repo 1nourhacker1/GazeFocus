@@ -44,3 +44,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [Plan 1 desk session](spikes/plan1-desk-session.md)
 - [gazefocus/win/_api.py](reference/gazefocus/win/_api.md)
 - [gazefocus/win/msgwindow.py](reference/gazefocus/win/msgwindow.md)
+- [gazefocus/win/windows.py](reference/gazefocus/win/windows.md)
