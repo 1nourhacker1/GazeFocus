@@ -149,3 +149,28 @@ def test_calibrate_cues_each_phase_before_it_records():
               cue=lambda name: cues.append((name, c.time())))
     assert [n for n, _ in cues] == ["LG", "LAPTOP", "DONE"]
     assert cues[0][1] < first_sample_t["LG"] and cues[1][1] < first_sample_t["LAPTOP"]
+
+
+def test_calibrate_hands_back_the_raw_samples():
+    c, said, samples = FakeClock(), [], {}
+    rng = np.random.default_rng(3)
+
+    def track(frame, t):
+        base = -32.0 if "LG" in said[-1] else -2.0
+        return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
+
+    calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append, samples_out=samples)
+    assert set(samples) == {"LG", "LAPTOP"} and len(samples["LG"]) >= MIN_CAL_SAMPLES
+
+
+def test_calibrate_lead_in_is_configurable():
+    c, said = FakeClock(), []
+    rng = np.random.default_rng(4)
+
+    def track(frame, t):
+        base = -32.0 if "LG" in said[-1] else -2.0
+        return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
+
+    calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append, seconds=6.0, lead_in_s=0.0)
+    assert c.now == pytest.approx(12.0, abs=0.2)  # two 6 s phases and no 2 s lead-ins
+    assert "(starting in 0 s)" in said[0]

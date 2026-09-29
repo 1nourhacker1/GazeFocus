@@ -58,14 +58,18 @@ def calibrate(
     read_frame: ReadFrame, track: Track, *, seconds: float = 6.0,
     clock=time.perf_counter, sleep=time.sleep, fps: float = 15.0, say=print,
     cue: Callable[[str], None] = lambda name: None,
+    samples_out: dict | None = None,
+    lead_in_s: float = 2.0,
 ) -> tuple[ZoneModel, dict]:
     collected = {}
     for name, prompt in CAL_PHASES:
-        say(f">>> {prompt}  (starting in 2 s)")
+        say(f">>> {prompt}  (starting in {lead_in_s:.0f} s)")
         cue(name)  # audible: the user may be looking at the other screen, not at this prompt
-        sleep(2.0)
+        sleep(lead_in_s)
         collected[name] = collect_phase(read_frame, track, seconds, clock=clock, sleep=sleep, fps=fps)
     cue("DONE")
+    if samples_out is not None:
+        samples_out.update(collected)  # raw samples, saved for offline refits
     counts = {k: sum(s.face for s in v) for k, v in collected.items()}
     if min(counts.values()) < MIN_CAL_SAMPLES:
         raise ValueError(

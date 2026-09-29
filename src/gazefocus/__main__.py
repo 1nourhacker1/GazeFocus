@@ -34,16 +34,7 @@ def _open_camera(cfg):
     return cam
 
 
-BEEPS = {"LG": 1, "LAPTOP": 2, "DONE": 3}
-
-
-def _beep(name: str) -> None:
-    """1 beep = look at the LG, 2 = look at the laptop, 3 = done."""
-    import winsound
-
-    # 450 ms: idle laptop audio needs ~200-300 ms to wake, so short tones get swallowed (desk session)
-    for _ in range(BEEPS.get(name, 0)):
-        winsound.Beep(1046 if name == "DONE" else 880, 450)
+from gazefocus.cues import beep as _beep  # noqa: E402  (kept importable as cli._beep)
 
 
 def _tracker():
@@ -66,12 +57,9 @@ def cmd_live(args) -> int:
 
 
 def cmd_calibrate(args) -> int:
-    import shutil
-
-    from gazefocus.logic.classifier import quality
+    from gazefocus.calibration import commit_calibration
     from gazefocus.runtime import calibrate
-    from gazefocus.storage import Calibration, calibration_path, now_iso, save_calibration
-    from gazefocus.win.monitors import enumerate_monitors, layout_fingerprint, zone_monitors
+    from gazefocus.win.monitors import enumerate_monitors, zone_monitors
 
     cfg = _config()
     monitors = enumerate_monitors()
@@ -82,37 +70,26 @@ def cmd_calibrate(args) -> int:
     if cam is None:
         return EXIT_CAMERA
     backend, tracker = cam.backend, _tracker()
+    samples: dict = {}
     try:
         print("listen for beeps: 1 = look at the LG, 2 = look at the laptop, 3 = done")
-        model, counts = calibrate(cam.read, tracker.process, seconds=args.seconds, fps=cfg.camera.fps, cue=_beep)
+        model, counts = calibrate(
+            cam.read, tracker.process, seconds=args.seconds, fps=cfg.camera.fps, cue=_beep, samples_out=samples
+        )
     except ValueError as e:
         print(f"calibration failed: {e}", file=sys.stderr)
         return EXIT_CALIBRATION
     finally:
         cam.release()
         tracker.close()
-    cal = Calibration(
-        created=now_iso(),
-        layout_fingerprint=layout_fingerprint(monitors),
-        monitors=tuple(monitors),
-        zone_monitors=zones,
+    result = commit_calibration(
+        model, counts, samples, monitors=monitors, dock_monitor=cfg.dock.monitor, force=args.force,
         camera={"index": cfg.camera.index, "width": cfg.camera.width, "height": cfg.camera.height, "backend": backend},
-        model=model,
-        samples=counts,
     )
-    if quality(model.separation) == "too close" and not args.force:
-        print(
-            f"calibration too close ({model.separation:.1f} sigma): turn your head a little more toward each "
-            "screen, or move the LG closer to the laptop. The previous calibration was kept; "
-            "rerun with --force to save this one anyway.",
-            file=sys.stderr,
-        )
+    if not result.saved:
+        print(f"{result.message} Rerun with --force to save this one anyway.", file=sys.stderr)
         return EXIT_CALIBRATION
-    path = calibration_path()
-    if path.exists():
-        shutil.copyfile(path, path.with_name("calibration.prev.json"))
-    save_calibration(cal, path)
-    print(f"saved {path} (mean yaw LG {model.mean_lg[0]:+.1f}, laptop {model.mean_laptop[0]:+.1f})")
+    print(result.message)
     return EXIT_OK
 
 
