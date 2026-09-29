@@ -58,7 +58,7 @@ def run_probe(
     read_frame: Callable[[], np.ndarray | None],
     track: Callable[[np.ndarray, float], HeadSample],
     *,
-    clock: Callable[[], float] = time.monotonic,
+    clock: Callable[[], float] = time.perf_counter,
     sleep: Callable[[float], None] = time.sleep,
     say: Callable[[str], None] = print,
     fps: float = 15.0,
@@ -127,13 +127,13 @@ def main() -> int:
         return 2
     backend = cam.backend
     tracker = HeadTracker(model_path())
-    cpu0, wall0 = time.process_time(), time.monotonic()
+    cpu0, wall0 = time.process_time(), time.perf_counter()
     try:
         stats = run_probe(cam.read, tracker.process)
     finally:
         cam.release()
         tracker.close()
-    cpu = (time.process_time() - cpu0) / (time.monotonic() - wall0) / (os.cpu_count() or 1) * 100.0
+    cpu = (time.process_time() - cpu0) / (time.perf_counter() - wall0) / (os.cpu_count() or 1) * 100.0
     print(format_report(stats, cpu, backend))
     return 0
 

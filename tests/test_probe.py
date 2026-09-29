@@ -52,3 +52,12 @@ def test_report_mentions_sign_and_budget():
     ]
     text = format_report(stats, cpu_total_pct=0.8, backend="MSMF")
     assert "NEGATIVE" in text and "0.8" in text and "MSMF" in text
+
+
+def test_default_clock_is_high_resolution():
+    # time.monotonic ticks every 15.6 ms on Windows (GetTickCount64), which quantized
+    # the first M0-A run's timings to 0 / 16 ms. perf_counter has 100 ns resolution.
+    import inspect
+    import time
+
+    assert inspect.signature(run_probe).parameters["clock"].default is time.perf_counter
