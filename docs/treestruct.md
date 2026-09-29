@@ -25,3 +25,6 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/types.py](reference/gazefocus/types.md)
 - [gazefocus/paths.py](reference/gazefocus/paths.md)
 - [gazefocus/vision/pose.py](reference/gazefocus/vision/pose.md)
+- [gazefocus/vision/camera.py](reference/gazefocus/vision/camera.md)
+- [gazefocus/win/camera_usage.py](reference/gazefocus/win/camera_usage.md)
+- [M0-D: camera sharing](spikes/m0d-camera-sharing.md)
