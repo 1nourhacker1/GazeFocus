@@ -58,3 +58,15 @@ def test_summarize_collapses_typing_runs():
     lines = summarize(decisions)
     assert sum("typing" in line for line in lines) == 1
     assert any("SWITCH" in line and "LG" in line for line in lines)
+
+
+def test_replay_ignores_the_recorded_simulated_switches_of_another_model():
+    """Review Important #3: watch records its *simulated* focus in ctx.focus_zone. A focus change
+    only counts as the user's when last_manual_focus_t changes on that frame."""
+    data = []
+    for i in range(60):  # 4 s of steady laptop gaze...
+        t = i / 15
+        recorded_focus = Zone.LG if 1.0 <= t < 3.0 else Zone.LAPTOP  # ...but model A had "switched" to LG
+        data.append((HeadSample(t, True, yaw=0.0), Context(t=t, focus_zone=recorded_focus)))
+    decisions = replay(data, TOY)
+    assert [d for d in decisions if d.action == "switch"] == []

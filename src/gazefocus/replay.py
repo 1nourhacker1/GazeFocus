@@ -59,10 +59,14 @@ def replay(frames: Iterable[tuple[HeadSample, Context]], model: ZoneModel, cfg: 
     classifier, decider = ZoneClassifier(model, cfg.classifier), GazeDecider(cfg.decider)
     out: list[Decision] = []
     sim_focus: Zone | None = None
-    recorded_prev: Zone | None = None
+    manual_prev: float | None = None
     for sample, ctx in frames:
-        if recorded_prev is None or ctx.focus_zone != recorded_prev:
-            sim_focus = recorded_prev = ctx.focus_zone  # the recording itself moved focus
+        # Follow the recording's focus only at the start and when the *user* moved it (a new
+        # last_manual_focus_t). Other recorded focus changes are the recording model's own
+        # (simulated or real) switches, which a replay with another model must not inherit.
+        if sim_focus is None or ctx.last_manual_focus_t != manual_prev:
+            sim_focus = ctx.focus_zone
+        manual_prev = ctx.last_manual_focus_t
         zone, margin = classifier.update(sample)
         d = decider.step(zone, margin, replace(ctx, focus_zone=sim_focus))
         if d.action == "switch":
