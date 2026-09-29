@@ -179,6 +179,12 @@ def configure_console() -> None:
             pass
 
 
+def cmd_run(args) -> int:
+    from gazefocus.app.main import run_app
+
+    return run_app(seconds=args.seconds)
+
+
 def _diag_zone_devices() -> tuple[dict, str]:
     """{zone: device} from a matching calibration, else primary = LAPTOP and the other = LG."""
     from gazefocus.storage import calibration_path, load_if_matches
@@ -257,6 +263,9 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("replay", help="run a recording through the classifier and decider")
     r.add_argument("file")
     r.set_defaults(fn=cmd_replay)
+    run = sub.add_parser("run", help="the GazeFocus background app (tray icon; focus follows your gaze)")
+    run.add_argument("--seconds", type=float, help="quit after this many seconds (smoke tests)")
+    run.set_defaults(fn=cmd_run)
     d = sub.add_parser("diag", help="check the Windows side: monitors, windows, a focus switch")
     dsub = d.add_subparsers(dest="what", required=True)
     dsub.add_parser("monitors", help="monitor layout, ids, fingerprint and zone mapping")

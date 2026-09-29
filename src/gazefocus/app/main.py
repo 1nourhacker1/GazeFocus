@@ -1,0 +1,370 @@
+"""`gazefocus run`: the background app. Everything lives on the Qt main thread except the camera.
+
+Wiring: MessageWindow (Raw Input, hotkey, lock/sleep/display events) + WinEvent foreground hook
++ CameraWorker thread -> Controller -> real focus switch; Tray for status and control.
+The camera runs only while switching is possible; pause, lock and sleep release it.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import os
+import signal
+import sys
+import time
+from typing import Callable
+
+from gazefocus.app.controller import Controller, Desktop
+from gazefocus.app.decision_log import DecisionLogger, setup_logging
+from gazefocus.app.state import MAX_TRACKER_FAILURES, AppState, Status
+from gazefocus.app.tray import Tray
+from gazefocus.app.workers import CalibrationJob, CalibrationOutcome, CameraWorker
+from gazefocus.calibration import commit_calibration
+from gazefocus.config import Config, ConfigWatcher, load_config, write_default_config
+from gazefocus.logic.classifier import ZoneClassifier
+from gazefocus.logic.decider import GazeDecider
+from gazefocus.paths import app_dir
+from gazefocus.storage import calibration_path, load_if_matches
+from gazefocus.types import HeadSample, Zone
+from gazefocus.win import _api, focus, rawinput, system, windows
+from gazefocus.win.foreground import ForegroundHook, MruTracker
+from gazefocus.win.monitors import MonitorInfo, enumerate_monitors, ensure_dpi_awareness, layout_fingerprint
+from gazefocus.win.msgwindow import MessageWindow
+from gazefocus.win.rawinput import InputTracker, InputWatcher
+from gazefocus.win.system import Hotkey, SingleInstance, SystemEvents
+
+CAMERA_RETRY_S = 5.0
+CRASH_RESTART_S = 2.0
+HEALTHY_RESET_S = 60.0
+DISPLAY_SETTLE_MS = 1500
+EXIT_ALREADY_RUNNING, EXIT_NO_MODEL = 4, 5
+
+
+def instance_name() -> str:
+    """One GazeFocus per user session; tests (GAZEFOCUS_HOME set) get their own mutex."""
+    home = os.environ.get("GAZEFOCUS_HOME")
+    return "Local\\GazeFocus" + (f"-{hashlib.sha1(home.encode()).hexdigest()[:8]}" if home else "")
+
+
+def real_desktop(work_area: Callable[[str], "tuple[int, int, int, int] | None"]) -> Desktop:
+    return Desktop(
+        foreground=lambda: _api.user32.GetForegroundWindow() or 0,
+        device_of_window=windows.device_of_window,
+        buttons_down=rawinput.buttons_down,
+        fullscreen=system.fullscreen_busy,
+        choose_target=lambda device, mru: windows.choose_target(device, mru, windows.window_facts, windows.top_level_windows),
+        bring_to_front=focus.bring_to_front,
+        title_of=lambda hwnd: windows.window_facts(hwnd).title,
+        cursor_pos=focus.cursor_pos,
+        device_of_point=windows.device_of_point,
+        warp_cursor=focus.warp_cursor,
+        window_center=focus.window_center,
+        work_area=work_area,
+    )
+
+
+class GazeFocusApp:
+    def __init__(
+        self,
+        cfg: Config,
+        *,
+        open_camera: Callable[[], object],
+        make_tracker: Callable[[], object],
+        beep: Callable[[str], None],
+        qapp,
+        log: logging.Logger,
+        dlog: logging.Logger,
+        desktop_factory: Callable[[Callable[[str], object]], Desktop] = real_desktop,
+        monitors: Callable[[], list[MonitorInfo]] = enumerate_monitors,
+        calibration_seconds: float = 6.0,
+        calibration_lead_in_s: float = 2.0,
+    ) -> None:
+        self.cfg, self.qapp, self.log, self.beep = cfg, qapp, log, beep
+        self.open_camera, self.make_tracker = open_camera, make_tracker
+        self.dlog = DecisionLogger(dlog)
+        self._monitors_fn, self._desktop_factory = monitors, desktop_factory
+        self.calibration_seconds, self.calibration_lead_in_s = calibration_seconds, calibration_lead_in_s
+        self.state = AppState()
+        self.monitors: list[MonitorInfo] = []
+        self._work_areas: dict[str, tuple[int, int, int, int]] = {}
+        self.controller: Controller | None = None
+        self._job: CalibrationJob | None = None
+        self._retry_at: float | None = None
+        self._restart_at: float | None = None
+        self._running_since: float | None = None
+        self._notified: set[str] = set()
+
+        self.window = MessageWindow("GazeFocus")
+        self.input = InputTracker()
+        self.input_watcher = InputWatcher(self.window, self.input)
+        self.mru = MruTracker()
+        self.fg_hook = ForegroundHook(self._on_foreground)
+        self.system_events = SystemEvents(
+            self.window,
+            on_lock=lambda: self._set("locked", True),
+            on_unlock=lambda: self._set("locked", False),
+            on_suspend=lambda: self._set("suspended", True),
+            on_resume=lambda: self._set("suspended", False),
+            on_display_change=self._on_display_change,
+        )
+        self.hotkey = self._register_hotkey(cfg.hotkey.pause)
+        self.tray = Tray(
+            on_toggle_pause=self.toggle_pause,
+            on_recalibrate=self.recalibrate,
+            on_open_config=lambda: os.startfile(str(app_dir() / "config.toml")),
+            on_open_logs=lambda: os.startfile(str(app_dir() / "logs")),
+            on_quit=self.quit,
+            restore_focus=self._restore_focus,
+            hotkey_text=cfg.hotkey.pause,
+        )
+        self.worker = CameraWorker(
+            open_camera, make_tracker,
+            on_sample=self._on_sample, on_failed=self._on_camera_failed, on_crashed=self._on_crashed,
+            fps=cfg.camera.fps,
+        )
+        self.config_watcher = ConfigWatcher(app_dir() / "config.toml", self._on_config)
+        self.refresh_layout()
+        self.apply()
+
+    # ---- layout, calibration, controller -------------------------------------------------
+    def refresh_layout(self) -> None:
+        self.monitors = self._monitors_fn()
+        self._work_areas = {m.device: m.work for m in self.monitors}
+        self.controller = None
+        if len(self.monitors) != 2:
+            self.state.calibration = "unsupported"
+            self.log.warning("GazeFocus needs exactly 2 monitors; found %d", len(self.monitors))
+            return
+        path = calibration_path()
+        cal, warning = load_if_matches(path, layout_fingerprint(self.monitors))
+        if cal is None:
+            self.state.calibration = "layout_changed" if path.exists() and "layout" in (warning or "") else "missing"
+            self.log.warning(warning or "not calibrated yet: use the tray's Recalibrate")
+            return
+        devices = {m.id: m.device for m in self.monitors}
+        zone_devices = {Zone.LAPTOP: devices.get(cal.zone_monitors.get("LAPTOP")), Zone.LG: devices.get(cal.zone_monitors.get("LG"))}
+        if None in zone_devices.values():
+            self.state.calibration = "unsupported"
+            self.log.warning("the calibration does not name both monitors; recalibrate with the LG connected")
+            return
+        self.state.calibration = "ok"
+        self.controller = Controller(
+            classifier=ZoneClassifier(cal.model, self.cfg.classifier),
+            decider=GazeDecider(self.cfg.decider),
+            input_tracker=self.input,
+            mru=self.mru,
+            desktop=self._desktop_factory(self._work_areas.get),
+            zone_devices=zone_devices,
+            cursor_idle_warp_ms=self.cfg.decider.cursor_idle_warp_ms,
+            log=self.dlog,
+        )
+        self.log.info("calibration loaded (%.1f sigma); LAPTOP=%s LG=%s", cal.model.separation,
+                      zone_devices[Zone.LAPTOP], zone_devices[Zone.LG])
+
+    # ---- the camera ------------------------------------------------------------------------
+    def apply(self) -> None:
+        wanted = self.state.camera_wanted and self._retry_at is None and self._restart_at is None
+        if wanted and not self.worker.running:
+            self.worker.start()
+            self._running_since = time.perf_counter()
+        elif not wanted and self.worker.running:
+            self.worker.stop()
+            self._running_since = None
+        self._update_tray()
+
+    def _on_sample(self, sample: HeadSample) -> None:
+        if self.state.switching and self.controller is not None:
+            self.controller.on_sample(sample)
+
+    def _on_camera_failed(self, why: str) -> None:
+        from gazefocus.win.camera_usage import camera_busy_message
+
+        self.state.camera_ok = False
+        self._retry_at = time.perf_counter() + CAMERA_RETRY_S
+        message = camera_busy_message() if "open" in why else why
+        self.log.warning("camera: %s; retrying every %.0f s", message, CAMERA_RETRY_S)
+        self._notify_once("camera", "Camera unavailable", message)
+        self.apply()
+
+    def _on_crashed(self, why: str) -> None:
+        self.state.tracker_failures += 1
+        self.log.error("tracker crashed (%d/%d): %s", self.state.tracker_failures, MAX_TRACKER_FAILURES, why)
+        if self.state.tracker_failures < MAX_TRACKER_FAILURES:
+            self._restart_at = time.perf_counter() + CRASH_RESTART_S
+        else:
+            self.tray.notify("GazeFocus stopped tracking", f"The tracker failed {MAX_TRACKER_FAILURES} times: {why}")
+        self.apply()
+
+    # ---- user and system events ---------------------------------------------------------------
+    def _set(self, flag: str, value: bool) -> None:
+        setattr(self.state, flag, value)
+        self.log.info("%s -> %s", flag, value)
+        self.apply()
+
+    def toggle_pause(self) -> None:
+        self._set("paused", not self.state.paused)
+
+    def _on_foreground(self, hwnd: int) -> None:
+        facts = windows.window_facts(hwnd)
+        self.mru.on_foreground(time.perf_counter(), hwnd, facts.device, is_target=windows.is_switch_target(facts)[0])
+
+    def _on_display_change(self) -> None:
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(DISPLAY_SETTLE_MS, self._relayout)  # Windows reports changes in bursts
+
+    def _relayout(self) -> None:
+        before = self.state.calibration
+        self.refresh_layout()
+        if self.state.calibration != before:
+            self.tray.notify("GazeFocus", f"Monitor layout: {self.state.status.value}")
+        self.apply()
+
+    def _restore_focus(self) -> None:
+        hwnd = self.mru.last_app_window
+        if hwnd:
+            focus.bring_to_front(hwnd)
+
+    def recalibrate(self) -> None:
+        if self._job is not None and self._job.running:
+            return
+        self.state.calibrating = True
+        self.apply()  # stops the tracking camera: calibration needs it exclusively
+        self.tray.notify("Calibrating", "Listen: 1 beep = look at the LG, 2 beeps = the laptop, 3 = done.")
+        self._job = CalibrationJob(
+            self.open_camera, self.make_tracker, cue=self.beep, on_done=self._calibration_done,
+            say=self.log.info, seconds=self.calibration_seconds, fps=self.cfg.camera.fps,
+            lead_in_s=self.calibration_lead_in_s,
+        )
+        self._job.start()
+
+    def _calibration_done(self, outcome: CalibrationOutcome) -> None:
+        self.state.calibrating = False
+        if outcome.model is None:
+            self.tray.notify("Calibration failed", outcome.error or "unknown error")
+            self.log.warning("calibration failed: %s", outcome.error)
+        else:
+            cam = self.cfg.camera
+            result = commit_calibration(
+                outcome.model, outcome.counts, outcome.samples, monitors=self.monitors,
+                dock_monitor=self.cfg.dock.monitor,
+                camera={"index": cam.index, "width": cam.width, "height": cam.height, "backend": outcome.backend},
+            )
+            self.tray.notify("Calibration saved" if result.saved else "Calibration not saved", result.message)
+            self.log.info(result.message)
+            self.refresh_layout()
+        self.apply()
+
+    def _on_config(self, cfg: Config, warnings: list[str]) -> None:
+        for w in warnings:
+            self.log.warning("config: %s", w)
+        hotkey_changed = cfg.hotkey.pause != self.cfg.hotkey.pause
+        self.cfg = cfg
+        self.worker.fps = cfg.camera.fps
+        if hotkey_changed:
+            if self.hotkey is not None:
+                self.hotkey.close()
+            self.hotkey = self._register_hotkey(cfg.hotkey.pause)
+        self.refresh_layout()
+        self.log.info("config reloaded")
+        self.apply()
+
+    def _register_hotkey(self, text: str) -> Hotkey | None:
+        try:
+            hk = Hotkey(self.window, text, self.toggle_pause)
+        except ValueError as e:
+            self.log.warning("hotkey: %s", e)
+            return None
+        if not hk.registered:
+            self.log.warning("hotkey %s is taken by another app; use the tray to pause", text)
+        return hk
+
+    # ---- housekeeping (1 Hz) ----------------------------------------------------------------
+    def tick(self) -> None:
+        now = time.perf_counter()
+        self.config_watcher.poll()
+        fps = float(self.cfg.camera.fps)
+        if self.input.idle_s(now) >= self.cfg.camera.idle_after_s:
+            fps = float(self.cfg.camera.idle_fps)
+        if system.on_battery():
+            fps = min(fps, float(self.cfg.camera.battery_fps))
+        self.worker.fps = fps
+        if self._retry_at is not None and now >= self._retry_at:
+            self._retry_at, self.state.camera_ok = None, True  # try again; a failure re-arms the timer
+        if self._restart_at is not None and now >= self._restart_at:
+            self._restart_at = None
+        if self.state.tracker_failures and self._running_since and now - self._running_since >= HEALTHY_RESET_S:
+            self.state.tracker_failures = 0
+        self.apply()
+
+    def _notify_once(self, key: str, title: str, text: str) -> None:
+        if key not in self._notified:
+            self._notified.add(key)
+            self.tray.notify(title, text)
+
+    def _update_tray(self) -> None:
+        focus_zone = self.controller.focus_zone() if self.controller is not None else None
+        self.tray.update(self.state.status, focus_zone)
+
+    def quit(self) -> None:
+        self.qapp.quit()
+
+    def close(self) -> None:
+        self.worker.stop()
+        for part in (self.fg_hook, self.input_watcher, self.system_events, self.hotkey, self.tray, self.window):
+            if part is not None:
+                part.close()
+
+
+def run_app(seconds: float | None = None) -> int:
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    from gazefocus.cues import beep
+    from gazefocus.paths import model_path
+    from gazefocus.vision.camera import CameraSource
+    from gazefocus.vision.tracker import HeadTracker
+
+    ensure_dpi_awareness()
+    instance = SingleInstance(instance_name())
+    if not instance.acquired:
+        print("GazeFocus is already running (look for its tray icon).", file=sys.stderr)
+        return EXIT_ALREADY_RUNNING
+    if not model_path().is_file():
+        print("face model missing; run: uv run python scripts/fetch_model.py", file=sys.stderr)
+        instance.close()
+        return EXIT_NO_MODEL
+    cfg_path = app_dir() / "config.toml"
+    write_default_config(cfg_path)
+    cfg, warnings = load_config(cfg_path)
+    log, dlog = setup_logging(app_dir() / "logs")
+    for w in warnings:
+        log.warning("config: %s", w)
+
+    def open_camera():
+        c = cfg.camera
+        cam = CameraSource(c.index, c.width, c.height)
+        return cam if cam.open() else None
+
+    qapp = QApplication.instance() or QApplication(sys.argv)
+    qapp.setQuitOnLastWindowClosed(False)
+    app = GazeFocusApp(cfg, open_camera=open_camera, make_tracker=lambda: HeadTracker(model_path()),
+                       beep=beep, qapp=qapp, log=log, dlog=dlog)
+    housekeeping = QTimer()
+    housekeeping.timeout.connect(app.tick)
+    housekeeping.start(1000)
+    signal.signal(signal.SIGINT, lambda *_: qapp.quit())
+    wake = QTimer()  # lets Python notice Ctrl+C while Qt's loop runs
+    wake.timeout.connect(lambda: None)
+    wake.start(200)
+    if seconds is not None:
+        QTimer.singleShot(int(seconds * 1000), qapp.quit)
+    log.info("GazeFocus started: %s", app.state.status.value)
+    try:
+        return qapp.exec()
+    finally:
+        housekeeping.stop()
+        app.close()
+        instance.close()
+        log.info("GazeFocus stopped")

@@ -19,8 +19,11 @@ def test_help_lists_commands(capsys):
         main(["--help"])
     assert e.value.code == 0
     out = capsys.readouterr().out
-    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live", "diag"):
-        assert cmd in out
+    # argparse prints the sub-commands as "{probe,live,...}"; match names exactly
+    # (a bare substring check passed "run" via watch's "dry run" help text)
+    commands = set(out[out.index("{") + 1 : out.index("}")].split(","))
+    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live", "run", "diag"):
+        assert cmd in commands
 
 
 def test_cli_camera_busy(monkeypatch, capsys):  # Review Focus #1
@@ -140,3 +143,15 @@ def test_diag_focus_with_no_window_on_that_screen(monkeypatch, capsys):
     monkeypatch.setattr(win_windows, "choose_target", lambda *a, **k: None)
     assert main(["diag", "focus", "LG", "--delay", "0"]) == 1
     assert "no window" in capsys.readouterr().out
+
+
+def test_run_refuses_a_second_instance(capsys):
+    from gazefocus.app.main import instance_name
+    from gazefocus.win.system import SingleInstance
+
+    holder = SingleInstance(instance_name())
+    try:
+        assert main(["run", "--seconds", "0.1"]) == 4
+    finally:
+        holder.close()
+    assert "already running" in capsys.readouterr().err
