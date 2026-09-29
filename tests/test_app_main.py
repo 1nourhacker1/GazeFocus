@@ -9,8 +9,9 @@ from gazefocus.app.controller import Desktop
 from gazefocus.app.main import GazeFocusApp, instance_name
 from gazefocus.app.state import Status
 from gazefocus.calibration import commit_calibration
-from gazefocus.config import Config
+from gazefocus.config import Config, HotkeyCfg
 from gazefocus.logic.classifier import ZoneModel
+from gazefocus.storage import calibration_path
 from gazefocus.types import HeadSample
 from gazefocus.win.focus import SwitchResult
 from gazefocus.win.monitors import MonitorInfo
@@ -19,6 +20,7 @@ LAP = MonitorInfo(r"\\.\FAKE1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552)
 LG = MonitorInfo(r"\\.\FAKE5", "id-lg", (-1920, -302, 0, 778), (-1920, -302, 0, 738), False)
 MODEL = ZoneModel(w=(-1 / 15, 0.0, 0.0), b=1.0, separation=9.0, mean_lg=(30, 10, 0), mean_laptop=(0, 10, 0), sd=(3.0, 5.0, 0.1))
 FRAME = np.zeros((2, 2, 3), np.uint8)
+TEST_HOTKEY = "Ctrl+Alt+Shift+F24"  # tests never register the real Ctrl+Alt+G
 
 
 class FakeCamera:
@@ -96,7 +98,7 @@ def rig(qapp):
 
     log = logging.getLogger("test.app")
     app = GazeFocusApp(
-        Config(), open_camera=open_camera, make_tracker=FakeTracker, beep=beeps.append, qapp=qapp,
+        Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY)), open_camera=open_camera, make_tracker=FakeTracker, beep=beeps.append, qapp=qapp,
         log=log, dlog=logging.getLogger("test.app.decisions"), desktop_factory=desktop,
         monitors=lambda: [LAP, LG], calibration_seconds=1.8, calibration_lead_in_s=0.0,
     )
@@ -189,6 +191,58 @@ def test_recalibrate_from_the_tray_saves_and_resumes(rig, qapp):
     assert wait_until(qapp, lambda: not app.state.calibrating, timeout=15.0)
     assert beeps == ["LG", "LAPTOP", "DONE"]
     assert app.state.status is Status.RUNNING and app.worker.running
+
+
+@pytest.mark.parametrize("flag", ["paused", "locked", "suspended"])
+def test_pause_lock_or_sleep_during_recalibrate_cancels_it(rig, qapp, flag):
+    app, _, cams, beeps, _ = rig
+    calibrate_fake()
+    before = calibration_path().read_text()
+    app.calibration_seconds = 10.0
+    app.recalibrate()
+    assert wait_until(qapp, lambda: cams)  # the calibration has the camera
+    app._set(flag, True)
+    assert wait_until(qapp, lambda: cams[-1].released, timeout=1.0)
+    assert wait_until(qapp, lambda: not app.state.calibrating, timeout=1.0)
+    assert not app.worker.running and "DONE" not in beeps
+    assert calibration_path().read_text() == before  # the good calibration is kept
+
+
+def test_recalibrate_is_refused_without_two_monitors(rig):
+    app, _, cams, beeps, _ = rig
+    calibrate_fake()
+    before = calibration_path().read_text()
+    app._monitors_fn = lambda: [LAP]  # the LG was unplugged
+    app.refresh_layout()
+    app.apply()
+    app.recalibrate()
+    assert not app.state.calibrating and app._job is None and cams == [] and beeps == []
+    assert calibration_path().read_text() == before
+
+
+def test_a_layout_change_during_recalibrate_keeps_the_old_calibration(rig, qapp):
+    app, _, _, beeps, _ = rig
+    calibrate_fake()
+    before = calibration_path().read_text()
+
+    def cue(name):
+        beeps.append(name)
+        FakeTracker.yaw = 30.0 if name == "LG" else 0.0
+        if name == "DONE":
+            app._monitors_fn = lambda: [LAP]  # the LG is unplugged just before the end
+
+    app.beep = cue
+    app.cfg = replace(app.cfg, camera=replace(app.cfg.camera, fps=60))
+    app.recalibrate()
+    assert wait_until(qapp, lambda: not app.state.calibrating, timeout=15.0)
+    assert beeps == ["LG", "LAPTOP", "DONE"]
+    assert calibration_path().read_text() == before
+
+
+def test_the_rig_never_holds_the_real_pause_hotkey(rig):
+    """A real `gazefocus run` started while the tests run would lose Ctrl+Alt+G for its whole session."""
+    app = rig[0]
+    assert app.cfg.hotkey.pause == TEST_HOTKEY
 
 
 def test_instance_name_is_isolated_under_tests(_isolated_home):

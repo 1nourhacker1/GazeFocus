@@ -89,6 +89,64 @@ def test_tracker_crash_is_reported_and_resources_released(qapp):
     assert cam.released and tracker.closed
 
 
+def test_resuming_during_a_slow_open_does_not_revive_the_stopped_run(qapp):
+    """Pause while the camera is still opening, then resume: the stopped run must give the camera back."""
+    gate, opens, cams, samples = threading.Event(), [], [], []
+
+    def open_camera():  # the first open is slow, like MSMF plus the DSHOW fallback taking seconds
+        opens.append(1)
+        if len(opens) == 1:
+            gate.wait(5.0)
+        cams.append(FakeCamera())
+        return cams[-1]
+
+    w = CameraWorker(open_camera, FakeTracker, on_sample=samples.append, on_failed=print, on_crashed=print)
+    w.start()
+    assert wait_until(qapp, lambda: opens)
+    w.stop(timeout=0.05)  # times out: the open is still in progress
+    w.start()  # resume while that run still exists
+    gate.set()
+    assert wait_until(qapp, lambda: cams and cams[0].released)
+    qapp.processEvents()
+    assert samples == [] and not w.running
+    assert wait_until(qapp, lambda: not w.alive)
+    assert w.start()  # once the old run has ended, a new one starts
+    assert wait_until(qapp, lambda: samples)
+    w.stop()
+    assert not w.alive and len(cams) == 2 and all(c.released for c in cams)
+
+
+def test_a_run_stopped_while_opening_reports_no_failure(qapp):
+    gate, failed = threading.Event(), []
+
+    def busy_open():
+        gate.wait(5.0)
+        return None  # the open failed, but nobody wants the camera any more
+
+    w = CameraWorker(busy_open, FakeTracker, on_sample=print, on_failed=failed.append, on_crashed=print)
+    w.start()
+    w.stop(timeout=0.05)
+    gate.set()
+    assert not wait_until(qapp, lambda: failed, timeout=0.5)
+
+
+def test_cancel_stops_a_calibration_and_releases_the_camera(qapp):
+    cams, cues, outcomes = [], [], []
+
+    def open_camera():
+        cams.append(FakeCamera())
+        return cams[-1]
+
+    job = CalibrationJob(open_camera, FakeTracker, cue=cues.append, on_done=outcomes.append,
+                         seconds=10.0, fps=30.0, lead_in_s=0.0)
+    job.start()
+    assert wait_until(qapp, lambda: cams)
+    job.cancel()
+    assert wait_until(qapp, lambda: outcomes, timeout=1.0)
+    assert outcomes[0].cancelled and outcomes[0].model is None
+    assert cams[0].released and "DONE" not in cues
+
+
 def test_calibration_job_runs_both_phases_with_cues(qapp):
     cues, outcomes = [], []
     phase = {"yaw": -32.0}

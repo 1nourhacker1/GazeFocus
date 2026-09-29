@@ -58,28 +58,43 @@ class CameraWorker:
         self._bridge.sample.connect(on_sample)
         self._bridge.failed.connect(on_failed)
         self._bridge.crashed.connect(on_crashed)
-        self._stop = threading.Event()
+        self._stop = threading.Event()  # the current run's; every run gets its own
         self._thread: threading.Thread | None = None
 
     @property
-    def running(self) -> bool:
+    def alive(self) -> bool:
+        """The thread exists: running, or stopped but not yet done with the camera."""
         return self._thread is not None and self._thread.is_alive()
 
-    def start(self) -> None:
-        if self.running:
-            return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name="gazefocus-camera", daemon=True)
-        self._thread.start()
+    @property
+    def running(self) -> bool:
+        return self.alive and not self._stop.is_set()
 
-    def stop(self, timeout: float = 3.0) -> None:
+    def start(self) -> bool:
+        """Start a run; False if one is running or a stopped one still holds the camera (retry later)."""
+        if self.alive:
+            return False
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, args=(self._stop,), name="gazefocus-camera", daemon=True)
+        self._thread.start()
+        return True
+
+    def stop(self, timeout: float = 0.5) -> None:
+        """Ask the run to end; it releases the camera as soon as it sees the request.
+
+        Usually that is within one frame. An open still in progress can take seconds: the join
+        gives up after `timeout` so the Qt thread never freezes, and `alive` stays True until then.
+        """
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout)
-            self._thread = None
 
-    def _run(self) -> None:
+    def _run(self, stop: threading.Event) -> None:
         cam = self.open_camera()
+        if stop.is_set():  # stopped while the camera was opening
+            if cam is not None:
+                cam.release()
+            return
         if cam is None:
             self._bridge.failed.emit("could not open the camera")
             return
@@ -87,7 +102,7 @@ class CameraWorker:
         try:
             tracker = self.make_tracker()
             missed, next_t = 0, time.perf_counter()
-            while not self._stop.is_set():
+            while not stop.is_set():
                 frame = cam.read()
                 if frame is None:
                     missed += 1
@@ -98,13 +113,17 @@ class CameraWorker:
                 missed = 0
                 self._bridge.sample.emit(tracker.process(frame, time.perf_counter()))
                 next_t = max(next_t + 1.0 / max(self.fps, 0.1), time.perf_counter() - 0.5)
-                self._stop.wait(max(0.0, next_t - time.perf_counter()))
+                stop.wait(max(0.0, next_t - time.perf_counter()))
         except Exception as e:  # reported to the main thread, which restarts us (spec §12.1)
             self._bridge.crashed.emit(f"{type(e).__name__}: {e}")
         finally:
             cam.release()
             if tracker is not None:
                 tracker.close()
+
+
+class CalibrationCancelled(Exception):
+    """Raised on the calibration thread once cancel() is called."""
 
 
 @dataclass(frozen=True)
@@ -114,6 +133,7 @@ class CalibrationOutcome:
     samples: dict = field(default_factory=dict)
     backend: str | None = None
     error: str | None = None
+    cancelled: bool = False
 
 
 class CalibrationJob:
@@ -140,6 +160,7 @@ class CalibrationJob:
         self._bridge = _Bridge()
         self._bridge.done.connect(on_done)
         self._thread: threading.Thread | None = None
+        self._cancel = threading.Event()
 
     @property
     def running(self) -> bool:
@@ -150,19 +171,47 @@ class CalibrationJob:
             self._thread = threading.Thread(target=self._run, name="gazefocus-calibration", daemon=True)
             self._thread.start()
 
+    def cancel(self, timeout: float = 0.5) -> None:
+        """Stop mid-run (pause, lock, sleep): the camera is released and on_done gets cancelled=True."""
+        self._cancel.set()
+        if self._thread is not None:
+            self._thread.join(timeout)
+
+    def _check(self) -> None:
+        if self._cancel.is_set():
+            raise CalibrationCancelled
+
+    def _sleep(self, seconds: float) -> None:
+        self._cancel.wait(seconds)
+        self._check()
+
+    def _cue(self, name: str) -> None:
+        self._check()
+        self.cue(name)
+
     def _run(self) -> None:
         cam = self.open_camera()
         if cam is None:
-            self._bridge.done.emit(CalibrationOutcome(None, error="could not open the camera"))
+            self._bridge.done.emit(
+                CalibrationOutcome(None, error="could not open the camera", cancelled=self._cancel.is_set())
+            )
             return
         backend, tracker, samples = cam.backend, None, {}
+
+        def read_frame():
+            self._check()
+            return cam.read()
+
         try:
+            self._check()
             tracker = self.make_tracker()
             model, counts = calibrate(
-                cam.read, tracker.process, seconds=self.seconds, fps=self.fps,
-                say=self.say, cue=self.cue, samples_out=samples, lead_in_s=self.lead_in_s,
+                read_frame, tracker.process, seconds=self.seconds, fps=self.fps, say=self.say,
+                cue=self._cue, sleep=self._sleep, samples_out=samples, lead_in_s=self.lead_in_s,
             )
             self._bridge.done.emit(CalibrationOutcome(model, counts, samples, backend))
+        except CalibrationCancelled:
+            self._bridge.done.emit(CalibrationOutcome(None, backend=backend, error="cancelled", cancelled=True))
         except Exception as e:
             self._bridge.done.emit(CalibrationOutcome(None, samples=samples, backend=backend, error=str(e)))
         finally:

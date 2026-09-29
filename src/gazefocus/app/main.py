@@ -90,6 +90,7 @@ class GazeFocusApp:
         self._work_areas: dict[str, tuple[int, int, int, int]] = {}
         self.controller: Controller | None = None
         self._job: CalibrationJob | None = None
+        self._job_layout: str | None = None  # the layout fingerprint the running calibration started on
         self._retry_at: float | None = None
         self._restart_at: float | None = None
         self._running_since: float | None = None
@@ -166,8 +167,8 @@ class GazeFocusApp:
     def apply(self) -> None:
         wanted = self.state.camera_wanted and self._retry_at is None and self._restart_at is None
         if wanted and not self.worker.running:
-            self.worker.start()
-            self._running_since = time.perf_counter()
+            if self.worker.start():  # refused while a stopped run still holds the camera; tick retries
+                self._running_since = time.perf_counter()
         elif not wanted and self.worker.running:
             self.worker.stop()
             self._running_since = None
@@ -200,6 +201,8 @@ class GazeFocusApp:
     def _set(self, flag: str, value: bool) -> None:
         setattr(self.state, flag, value)
         self.log.info("%s -> %s", flag, value)
+        if value and self._job is not None and self._job.running:
+            self._job.cancel()  # pause, lock and sleep release the camera, even mid-calibration
         self.apply()
 
     def toggle_pause(self) -> None:
@@ -229,6 +232,13 @@ class GazeFocusApp:
     def recalibrate(self) -> None:
         if self._job is not None and self._job.running:
             return
+        monitors = self._monitors_fn()
+        if len(monitors) != 2:
+            self.tray.notify("Can't calibrate yet", f"GazeFocus needs 2 monitors and sees {len(monitors)}: "
+                             "connect the LG, then Recalibrate.")
+            self.log.warning("recalibrate refused: %d monitor(s)", len(monitors))
+            return
+        self._job_layout = layout_fingerprint(monitors)
         self.state.calibrating = True
         self.apply()  # stops the tracking camera: calibration needs it exclusively
         self.tray.notify("Calibrating", "Listen: 1 beep = look at the LG, 2 beeps = the laptop, 3 = done.")
@@ -241,13 +251,22 @@ class GazeFocusApp:
 
     def _calibration_done(self, outcome: CalibrationOutcome) -> None:
         self.state.calibrating = False
-        if outcome.model is None:
+        monitors = self._monitors_fn()
+        if outcome.cancelled:
+            self.tray.notify("Calibration cancelled", "The previous calibration was kept.")
+            self.log.info("calibration cancelled")
+        elif outcome.model is None:
             self.tray.notify("Calibration failed", outcome.error or "unknown error")
             self.log.warning("calibration failed: %s", outcome.error)
+        elif layout_fingerprint(monitors) != self._job_layout:
+            self.tray.notify("Calibration not saved", "The monitors changed during calibration. "
+                             "The previous calibration was kept.")
+            self.log.warning("calibration not saved: the monitor layout changed during it")
+            self.refresh_layout()
         else:
             cam = self.cfg.camera
             result = commit_calibration(
-                outcome.model, outcome.counts, outcome.samples, monitors=self.monitors,
+                outcome.model, outcome.counts, outcome.samples, monitors=monitors,
                 dock_monitor=self.cfg.dock.monitor,
                 camera={"index": cam.index, "width": cam.width, "height": cam.height, "backend": outcome.backend},
             )
@@ -311,7 +330,9 @@ class GazeFocusApp:
         self.qapp.quit()
 
     def close(self) -> None:
-        self.worker.stop()
+        if self._job is not None:
+            self._job.cancel()
+        self.worker.stop(timeout=3.0)
         for part in (self.fg_hook, self.input_watcher, self.system_events, self.hotkey, self.tray, self.window):
             if part is not None:
                 part.close()
