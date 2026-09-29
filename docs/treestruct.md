@@ -36,3 +36,5 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/config.py](reference/gazefocus/config.md)
 - [gazefocus/logic/classifier.py](reference/gazefocus/logic/classifier.md)
 - [gazefocus/logic/decider.py](reference/gazefocus/logic/decider.md)
+- [gazefocus/win/monitors.py](reference/gazefocus/win/monitors.md)
+- [gazefocus/storage.py](reference/gazefocus/storage.md)
