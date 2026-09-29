@@ -8,11 +8,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gazefocus.logic.classifier import ZoneModel
+from gazefocus.logic.classifier import FEATURES, ZoneModel
 from gazefocus.paths import app_dir
 from gazefocus.win.monitors import MonitorInfo
 
-VERSION = 1
+VERSION = 2  # v2 (2026-09-29): 3 features + per-feature sd; v1 files must be recalibrated
 
 
 @dataclass(frozen=True)
@@ -63,8 +63,9 @@ def load_calibration(path: Path) -> tuple[Calibration | None, str | None]:
             for m in d["layout"]["monitors"]
         )
         model = ZoneModel.from_dict(d["model"])
-        values = (*model.w, model.b, model.separation)
-        if len(model.w) != 4 or not all(math.isfinite(v) for v in values):
+        values = (*model.w, model.b, model.separation, *model.sd)
+        sizes = {len(model.w), len(model.sd), len(model.mean_lg), len(model.mean_laptop)}
+        if sizes != {len(FEATURES)} or not all(math.isfinite(v) for v in values) or min(model.sd) <= 0:
             raise ValueError("model has non-finite or wrong-sized weights")
         return (
             Calibration(

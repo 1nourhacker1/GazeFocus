@@ -5,7 +5,7 @@ from gazefocus.logic.decider import Context
 from gazefocus.replay import Recorder, read_recording, replay, summarize
 from gazefocus.types import HeadSample, Zone
 
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0, 0), mean_laptop=(0, 0, 0, 0))
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
 
 
 def frames(segments, focus=Zone.LAPTOP, **ctx_kw):

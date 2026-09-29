@@ -16,7 +16,7 @@ from gazefocus.runtime import (
 from gazefocus.types import HeadSample, Zone
 
 FRAME = np.zeros((2, 2, 3), np.uint8)
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0, 0), mean_laptop=(0, 0, 0, 0))
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
 
 
 class FakeClock:
@@ -41,7 +41,8 @@ def test_pacer_holds_the_rate():
 def test_collect_phase_discards_settle_time():
     c = FakeClock()
     out = collect_phase(lambda: FRAME, lambda f, t: HeadSample(t, True), 2.0, clock=c.time, sleep=c.sleep)
-    assert 23 <= len(out) <= 25 and out[0].t >= 0.4
+    # settle 1.0 s (desk session: a head turn between screens takes ~1 s): (2.0 - 1.0) * 15 frames
+    assert 14 <= len(out) <= 16 and out[0].t >= 1.0 - 1e-9
 
 
 def test_collect_phase_survives_no_frames():
@@ -66,7 +67,7 @@ def test_calibrate_fits_and_counts():
 
     model, counts = calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append)
     assert counts["LG"] >= MIN_CAL_SAMPLES and counts["LAPTOP"] >= MIN_CAL_SAMPLES
-    assert model.z(np.array([-32.0, 0, 0, 0])) < -0.5 < 0.5 < model.z(np.array([-2.0, 0, 0, 0]))
+    assert model.z(np.array([-32.0, 0, 0])) < -0.5 < 0.5 < model.z(np.array([-2.0, 0, 0]))
     assert any("LG" in s for s in said) and any("separation" in s for s in said)
 
 

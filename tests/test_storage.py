@@ -12,7 +12,7 @@ from gazefocus.storage import (
 from gazefocus.win.monitors import MonitorInfo
 
 LAP = MonitorInfo(r"\\.\DISPLAY1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True)
-MODEL = ZoneModel(w=(0.05, -0.02, 0.4, 0.0), b=0.9, separation=6.5, mean_lg=(-34, 7, -0.3, 0), mean_laptop=(-3, -8, 0.1, 0))
+MODEL = ZoneModel(w=(-0.06, 0.02, 0.4), b=0.9, separation=6.5, mean_lg=(32, 7, 0.2), mean_laptop=(-2, 12, 0.0), sd=(5.0, 4.0, 0.1))
 
 
 def cal(fp="abc123"):
@@ -82,3 +82,14 @@ def test_layout_must_match(tmp_path):
 
 def test_calibration_path_is_in_app_dir(_isolated_home):
     assert calibration_path() == _isolated_home / "calibration.json"
+
+
+def test_version_1_file_is_rejected(tmp_path):
+    """v1 models had 4 features and no sd (replaced after the 2026-09-29 desk session)."""
+    p = tmp_path / "calibration.json"
+    save_calibration(cal(), p)
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d["version"] = 1
+    p.write_text(json.dumps(d), encoding="utf-8")
+    c, warn = load_calibration(p)
+    assert c is None and "version 1" in warn and "recalibrate" in warn

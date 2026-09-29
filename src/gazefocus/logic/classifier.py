@@ -1,4 +1,9 @@
-"""Calibration fit (two-class LDA) and per-frame screen classification (spec §6)."""
+"""Calibration fit and per-frame screen classification (spec §6, revised by the 2026-09-29 desk session).
+
+The discriminant uses a *diagonal* pooled covariance, so every weight follows its own
+feature's mean difference. The first real calibration showed full-covariance LDA exploiting
+the pitch<->eyelid correlation and pointing "LG" whenever the user looked down.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +15,16 @@ import numpy as np
 from gazefocus.config import ClassifierCfg
 from gazefocus.types import HeadSample, Zone
 
-FEATURES = ("yaw", "pitch", "iris_h", "iris_v")
+FEATURES = ("yaw", "pitch", "iris_h")
 MIN_SAMPLES = 5
+# Variance floors (per feature): 1 degree for the angles, 0.05 for the iris offset.
+VAR_FLOOR = np.array([1.0, 1.0, 0.05**2])
+TRIM_MADS = 3.0  # calibration frames farther than this from the screen's median yaw are turn frames
+_OOD_FEATURES = (1, 2)  # pitch and iris_h; yaw beyond either screen still points at that side
 
 
 def features(s: HeadSample) -> np.ndarray:
-    return np.array([s.yaw, s.pitch, s.iris_h, s.iris_v], dtype=float)
+    return np.array([s.yaw, s.pitch, s.iris_h], dtype=float)
 
 
 @dataclass(frozen=True)
@@ -27,9 +36,17 @@ class ZoneModel:
     separation: float
     mean_lg: tuple[float, ...]
     mean_laptop: tuple[float, ...]
+    sd: tuple[float, ...]  # pooled within-screen standard deviation per feature
 
     def z(self, f) -> float:
         return float(np.dot(self.w, f) + self.b)
+
+    def is_outlier(self, f, sigma: float) -> bool:
+        """True when pitch or iris_h is more than `sigma` sd from BOTH screens (e.g. looking at a phone)."""
+        f, sd = np.asarray(f, dtype=float), np.asarray(self.sd)
+        idx = list(_OOD_FEATURES)
+        far = [np.max(np.abs(f[idx] - np.asarray(mean)[idx]) / sd[idx]) for mean in (self.mean_lg, self.mean_laptop)]
+        return min(far) > sigma
 
     def to_dict(self) -> dict:
         return {
@@ -38,6 +55,7 @@ class ZoneModel:
             "separation": self.separation,
             "mean_lg": list(self.mean_lg),
             "mean_laptop": list(self.mean_laptop),
+            "sd": list(self.sd),
         }
 
     @staticmethod
@@ -48,40 +66,48 @@ class ZoneModel:
             separation=float(d["separation"]),
             mean_lg=tuple(float(v) for v in d["mean_lg"]),
             mean_laptop=tuple(float(v) for v in d["mean_laptop"]),
+            sd=tuple(float(v) for v in d["sd"]),
         )
 
 
-def fit_zone_model(lg: Sequence[HeadSample], laptop: Sequence[HeadSample], ridge: float = 1e-3) -> ZoneModel:
-    a = np.array([features(s) for s in lg if s.face]).reshape(-1, len(FEATURES))
-    b = np.array([features(s) for s in laptop if s.face]).reshape(-1, len(FEATURES))
+def _face_matrix(samples: Sequence[HeadSample]) -> np.ndarray:
+    return np.array([features(s) for s in samples if s.face]).reshape(-1, len(FEATURES))
+
+
+def _trim_turn_frames(x: np.ndarray) -> np.ndarray:
+    if len(x) == 0:
+        return x
+    yaw = x[:, 0]
+    med = np.median(yaw)
+    mad = np.median(np.abs(yaw - med)) * 1.4826
+    if mad < 1e-9:
+        return x
+    return x[np.abs(yaw - med) <= TRIM_MADS * mad]
+
+
+def fit_zone_model(lg: Sequence[HeadSample], laptop: Sequence[HeadSample]) -> ZoneModel:
+    a, b = _trim_turn_frames(_face_matrix(lg)), _trim_turn_frames(_face_matrix(laptop))
     if len(a) < MIN_SAMPLES or len(b) < MIN_SAMPLES:
         raise ValueError(
             f"need at least {MIN_SAMPLES} face samples per screen (got LG={len(a)}, laptop={len(b)})"
         )
-    both = np.vstack([a, b])
-    mu, sd = both.mean(axis=0), both.std(axis=0)
-    sd[sd < 1e-9] = 1.0  # a constant feature carries no information; keep it harmless
-    sa, sb = (a - mu) / sd, (b - mu) / sd
-    ma, mb = sa.mean(axis=0), sb.mean(axis=0)
-    within = (np.cov(sa, rowvar=False) * (len(sa) - 1) + np.cov(sb, rowvar=False) * (len(sb) - 1)) / (
-        len(sa) + len(sb) - 2
-    )
-    within = within + ridge * np.eye(len(FEATURES))
+    ma, mb = a.mean(axis=0), b.mean(axis=0)
+    var = (a.var(axis=0, ddof=1) * (len(a) - 1) + b.var(axis=0, ddof=1) * (len(b) - 1)) / (len(a) + len(b) - 2)
+    var = np.maximum(var, VAR_FLOOR)
     d = mb - ma
-    w_std = np.linalg.solve(within, d)
-    spread = float(d @ w_std)  # = separation**2 = projected distance between the means
+    w_raw = d / var
+    spread = float(d @ w_raw)  # = separation**2 (diagonal Mahalanobis distance between the means)
     if not np.isfinite(spread) or spread < 1e-9:
         raise ValueError("the two screens are indistinguishable in this calibration")
-    pa, pb = float(w_std @ ma), float(w_std @ mb)
-    scale, offset = 2.0 / (pb - pa), -(pa + pb) / (pb - pa)
-    w = scale * w_std / sd
-    b0 = offset - float(w @ mu)
+    pa, pb = float(w_raw @ ma), float(w_raw @ mb)
+    scale = 2.0 / (pb - pa)
     return ZoneModel(
-        w=tuple(float(v) for v in w),
-        b=b0,
+        w=tuple(float(v) for v in scale * w_raw),
+        b=-(pa + pb) / (pb - pa),
         separation=float(np.sqrt(spread)),
-        mean_lg=tuple(float(v) for v in a.mean(axis=0)),
-        mean_laptop=tuple(float(v) for v in b.mean(axis=0)),
+        mean_lg=tuple(float(v) for v in ma),
+        mean_laptop=tuple(float(v) for v in mb),
+        sd=tuple(float(v) for v in np.sqrt(var)),
     )
 
 
@@ -103,6 +129,7 @@ class ZoneClassifier:
         self._last_face_t: float | None = None
         self._lost = False
         self._latched_lg = False
+        self._restart = False  # set on face loss: the EMA restarts from the next face frame
 
     def _zone(self, m: float) -> Zone:
         if m <= -self.cfg.dead_band:
@@ -113,15 +140,17 @@ class ZoneClassifier:
 
     def update(self, s: HeadSample) -> tuple[Zone, float | None]:
         if s.face:
-            z = self.model.z(features(s))
-            if self._m is None or self._lost:
-                self._m = z
-            else:
-                self._m += self.cfg.ema_alpha * (z - self._m)
+            f = features(s)
             self._lost, self._latched_lg, self._last_face_t = False, False, s.t
+            if self.model.is_outlier(f, self.cfg.ood_sigma):
+                return Zone.UNKNOWN, None  # looking at neither screen; keep it out of the EMA
+            z = self.model.z(f)
+            self._m = z if self._m is None or self._restart else self._m + self.cfg.ema_alpha * (z - self._m)
+            self._restart = False
             return self._zone(self._m), self._m
         if not self._lost:
             self._lost = True
+            self._restart = True
             recent = self._last_face_t is not None and s.t - self._last_face_t <= self.cfg.face_lost_memory_s
             self._latched_lg = bool(recent and self._m is not None and self._m <= self.cfg.face_lost_lg_margin)
         if self._latched_lg:

@@ -41,7 +41,7 @@ class Pacer:
 
 def collect_phase(
     read_frame: ReadFrame, track: Track, seconds: float, *,
-    clock=time.perf_counter, sleep=time.sleep, fps: float = 15.0, settle_s: float = 0.4,
+    clock=time.perf_counter, sleep=time.sleep, fps: float = 15.0, settle_s: float = 1.0,
 ) -> list[HeadSample]:
     pacer, start, out = Pacer(fps, clock, sleep), clock(), []
     while (now := clock()) - start < seconds:
