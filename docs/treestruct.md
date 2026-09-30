@@ -60,3 +60,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/app/tray.py](reference/gazefocus/app/tray.md)
 - [gazefocus/app/main.py](reference/gazefocus/app/main.md)
 - [Plan 2 acceptance](spikes/plan2-acceptance.md)
+- [gazefocus/dock/motion.py](reference/gazefocus/dock/motion.md)
