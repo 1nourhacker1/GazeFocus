@@ -645,3 +645,11 @@ def test_no_face_since_the_camera_started_still_shows_no_face(rig):
     app._on_sample(HeadSample(time.perf_counter() - 0.6, False))  # the first frame, 0.6 s ago: nobody
     app._on_sample(HeadSample(time.perf_counter(), False))
     assert dock.views[-1].face is False
+
+
+def test_a_dock_rebuilt_with_its_panel_open_turns_the_preview_off(rig):
+    app, _, _, _, state = rig
+    state["docks"][-1].cb["on_panel"](True)
+    assert app.worker.preview_fps == 10.0
+    app._on_config(replace(app.cfg, dock=replace(app.cfg.dock, refraction=False)), [])
+    assert app.worker.preview_fps == 0.0

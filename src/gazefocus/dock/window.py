@@ -74,6 +74,7 @@ class DockWindow(QWidget):
         self._panel_from = self._panel_to = geometry.PANELS["status"]
         self._morph = Channel(1.0)
         self._reported = False  # what on_panel last said about the hover panel
+        self._last_pill_click = float("-inf")
         self.view = DockView(IDLE, Zone.LAPTOP)
         self.scene.update(self.view, clock())
         self.preview: QImage | None = None
@@ -194,6 +195,10 @@ class DockWindow(QWidget):
     def set_hidden(self, hidden: bool) -> None:
         """Out of the way (screen locked, a fullscreen app on this monitor), without closing."""
         if hidden and self.isVisible():
+            self._hover.stop()
+            self._leave.stop()
+            if self.panel_open:
+                self._close()  # its camera preview stops too
             self.ticker.stop()
             self._idle.stop()
             self._wake.stop()
@@ -202,8 +207,10 @@ class DockWindow(QWidget):
             self.show()
 
     def close(self) -> bool:
+        for timer in (self._hover, self._leave, self._wake, self._idle):
+            timer.stop()
+        self._report(False)  # a rebuilt dock starts closed: the app turns the preview off
         self.ticker.stop()
-        self._idle.stop()
         self.ticker.close()
         if self._grabber is not None:
             self._grabber.close()
@@ -219,8 +226,10 @@ class DockWindow(QWidget):
             hwnd = int(self.winId())
             make_noactivate(hwnd)
             exclude_from_capture(hwnd)
+        self._backdrop_key = self._glass_key = None  # whatever changed while hidden is drawn by the next grab
         self._idle.start()
         QTimer.singleShot(60, self._refresh_backdrop)  # once the capture exclusion has applied
+        self._kick()
 
     def nativeEvent(self, event_type, message):
         if self.native:
@@ -413,14 +422,20 @@ class DockWindow(QWidget):
             if action is not None:
                 action()
             return
-        if self.panel_open:
+        if t > 0.5:  # what is on screen decides, not the target: a click while it closes is still a panel click
             button = button_at(x, y, pill.cx - geometry.PANEL[0] / 2, pill.top)
             if button == "pause":
                 self.on_toggle_pause()
             elif button == "recalibrate":
                 self.on_recalibrate()
             return
+        if now - self._last_pill_click < QGuiApplication.styleHints().mouseDoubleClickInterval() / 1000:
+            return  # the second press of a double-click (Windows sends one before the double-click itself)
+        self._last_pill_click = now
         u, v = geometry.to_viewbox(x, y, geometry.glyph_origin(t, self.cfg.scale, pill))
         self.scene.ripple(u, v, now)  # clicking the pill toggles pause, with a ripple (spec §8.4)
         self.on_pill()
         self._kick()
+
+    def mouseDoubleClickEvent(self, e) -> None:
+        pass  # Qt's default calls mousePressEvent again: a double-click is one click

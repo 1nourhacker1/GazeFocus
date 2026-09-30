@@ -375,3 +375,67 @@ def test_the_pill_centre_is_where_the_drop_leaves_from(dock):
     p = closed_pill(d)
     assert d.pill_centre() == pytest.approx((d.x() + p.cx, d.y() + p.cy))
     assert d.raise_to_top() is False  # not a native window on the test platform
+
+
+def test_a_double_click_on_the_pill_is_one_click(dock):
+    d, clock, ticker, calls = dock
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    p = closed_pill(d)
+    at = QPointF(p.cx, p.cy)
+    # what Windows sends for a double-click: WM_LBUTTONDOWN, UP, DBLCLK (Qt: a press and a double-click), UP
+    for kind in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseButtonPress,
+                 QEvent.MouseButtonDblClick, QEvent.MouseButtonRelease):
+        held = Qt.NoButton if kind == QEvent.MouseButtonRelease else Qt.LeftButton
+        QApplication.sendEvent(d, QMouseEvent(kind, at, at, Qt.LeftButton, held, Qt.NoModifier))
+    assert calls.count("pause") == 1
+
+
+def test_closing_the_dock_stops_its_timers_and_reports_the_panel_closed(qapp):
+    calls = []
+    d = DockWindow(CFG, on_toggle_pause=lambda: None, on_recalibrate=lambda: None,
+                   on_panel=lambda o: calls.append(o), native=False, grabber_factory=FakeGrabber,
+                   ticker=ManualTicker(), clock=FakeClock(), seed=1)
+    d.place((0, 0, 1707, 1067))
+    d.show()
+    d._hover.timeout.emit()
+    d._leave.start()
+    d._wake.start(5000)
+    d.close()
+    assert calls == [True, False]  # the app turns the camera preview off again
+    assert not (d._hover.isActive() or d._leave.isActive() or d._wake.isActive())
+
+
+def test_showing_again_redraws_what_changed_while_hidden(dock):
+    d, clock, ticker, _ = dock
+    d.set_view(DockView(TRACKING, Zone.LG))
+    run_ticks(d, clock, ticker, 2.0)
+    d.set_hidden(True)
+    d.set_view(DockView(TRACKING, Zone.LAPTOP))  # changes while hidden: nothing is drawn
+    clock.t += 5.0
+    d.set_hidden(False)
+    before = d.frames
+    d._refresh_backdrop()  # the grab after showing: the same backdrop as before
+    assert d.frames > before
+
+
+def test_hiding_closes_the_open_panel(dock):
+    d, clock, ticker, calls = dock
+    d._hover.timeout.emit()
+    run_ticks(d, clock, ticker, 1.0)
+    d.set_hidden(True)
+    assert not d.panel_open and calls[-1] == ("panel", False)
+
+
+def test_a_click_while_the_panel_closes_is_still_a_panel_click(dock):
+    d, clock, ticker, calls = dock
+    d._hover.timeout.emit()
+    run_ticks(d, clock, ticker, 1.0)
+    d._leave.timeout.emit()  # closing: 380 ms
+    clock.t += 0.05
+    assert d.openness.get(clock.t) > 0.5
+    pill = geometry.pill_at(d.openness.get(clock.t), CFG.scale, d.width())
+    QTest.mouseClick(d, Qt.LeftButton, Qt.NoModifier, QPoint(int(pill.cx), int(pill.cy)))  # on the panel, no button
+    assert "pause" not in calls
