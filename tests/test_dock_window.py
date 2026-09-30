@@ -221,3 +221,9 @@ def test_paused_shows_resume_and_no_camera(dock):
     d.set_view(DockView(PAUSED, Zone.LG, title="Paused"))
     c = d._content()
     assert c.pause_label == "Resume" and c.preview is None and c.caption == "camera off"
+
+
+def test_a_new_typing_freeze_reaches_the_lid(dock):
+    d, clock, ticker, _ = dock
+    d.set_freeze(0.8)
+    assert d.scene.freeze_s == 0.8

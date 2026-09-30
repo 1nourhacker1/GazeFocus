@@ -110,6 +110,11 @@ class DockWindow(QWidget):
         self.preview, self.preview_sample = preview_image(frame), sample
         self._frame(self.clock())
 
+    def set_freeze(self, seconds: float) -> None:
+        """A new typing freeze (a live config change): the lid's melt must end when the freeze does."""
+        self.scene.freeze_s = seconds
+        self._kick()
+
     @property
     def panel_open(self) -> bool:
         return self.openness.target > 0.5

@@ -171,3 +171,23 @@ def test_view_for_running_reads_face_typing_and_blocked():
 
 def test_tile_geometry_matches_the_mockup():
     assert TILES[LG] == (18.0, 10.0, 22.0, 14.0) and TILES[LAP] == (48.0, 14.0, 22.0, 14.0)
+
+
+@pytest.mark.parametrize("freeze", [0.0, 0.2, 0.3])
+def test_short_typing_freezes_still_end_the_lid_on_time(freeze):
+    """typing_freeze_ms is tunable (0..60000): at or below the 0.3 s hold the lid must still clear, and never raise."""
+    s = GlyphScene(freeze_s=freeze, seed=1)
+    s.update(tracking(LG), 0.0)
+    s.update(tracking(LG, last_key_t=1.0), 1.0)
+    for t in (1.0, 1.1, 1.25, 1.3, 1.35, 1.6):
+        s.frame(t)  # never raises
+    after = s.frame(1.0 + freeze + 0.01)
+    assert after.tiles[LG].lid == 0.0 and after.amber == 0.0
+    assert not s.busy(1.0 + freeze + 0.5)
+
+
+def test_no_typing_freeze_means_no_lid_at_all():
+    s = GlyphScene(freeze_s=0.0, seed=1)
+    s.update(tracking(LG), 0.0)
+    s.update(tracking(LG, last_key_t=1.0), 1.0)
+    assert s.frame(1.05).tiles[LG].lid == 0.0

@@ -185,14 +185,20 @@ class GlyphScene:
         self.amp[zone].kick(0.6, now)
 
     # ---- the typing lid ---------------------------------------------------------------------------
+    @property
+    def _hold(self) -> float:
+        """The hold never outlasts the freeze (typing_freeze_ms is tunable down to 0)."""
+        return max(0.0, min(self.hold_s, self.freeze_s))
+
     def _melt(self, view: DockView | None, now: float) -> float:
         """1 while typing and during the hold, then linearly down to 0 when the freeze ends."""
-        if view is None or view.mode != TRACKING or view.last_key_t is None:
+        if view is None or view.mode != TRACKING or view.last_key_t is None or self.freeze_s <= 0:
             return 0.0
-        age = now - view.last_key_t
-        if age < self.hold_s:
+        age, hold = now - view.last_key_t, self._hold
+        if age < hold:
             return 1.0
-        return max(0.0, min(1.0, 1 - (age - self.hold_s) / (self.freeze_s - self.hold_s)))
+        span = self.freeze_s - hold
+        return 0.0 if span <= 0 else max(0.0, min(1.0, 1 - (age - hold) / span))
 
     def _lid_input(self, old: DockView, view: DockView, now: float) -> None:
         if view.mode != TRACKING or view.last_key_t is None or view.last_key_t == old.last_key_t:
@@ -253,7 +259,7 @@ class GlyphScene:
         v = self.view
         if v is None or v.mode != TRACKING or v.last_key_t is None or self.close.get(now) <= 0:
             return False
-        return v.last_key_t + self.hold_s <= now < v.last_key_t + self.freeze_s
+        return v.last_key_t + self._hold <= now < v.last_key_t + self.freeze_s
 
     def busy(self, now: float) -> bool:
         """Anything still moving: the window keeps drawing frames until this turns False."""
@@ -265,5 +271,5 @@ class GlyphScene:
         v = self.view
         if v is None or v.mode != TRACKING or v.last_key_t is None or self.close.target <= 0:
             return None
-        start = v.last_key_t + self.hold_s
-        return start if now < start else None
+        start = v.last_key_t + self._hold
+        return start if now < start < v.last_key_t + self.freeze_s else None

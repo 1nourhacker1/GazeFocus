@@ -376,9 +376,12 @@ class GazeFocusApp:
             self.log.warning("config: %s", w)
         hotkey_changed = cfg.hotkey.pause != self.cfg.hotkey.pause
         dock_changed = cfg.dock != self.cfg.dock
+        freeze_changed = cfg.decider.typing_freeze_ms != self.cfg.decider.typing_freeze_ms
         self.cfg = cfg
         if dock_changed:
             self._make_dock()  # placed by refresh_layout below
+        elif freeze_changed and self.dock is not None:
+            self.dock.set_freeze(cfg.decider.typing_freeze_ms / 1000.0)
         self.worker.fps = cfg.camera.fps
         if hotkey_changed:
             if self.hotkey is not None:

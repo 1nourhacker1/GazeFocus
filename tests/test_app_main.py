@@ -73,6 +73,7 @@ class FakeDock:
     def __init__(self, cfg, **callbacks):
         self.cfg, self.cb = cfg, callbacks
         self.views, self.previews, self.hidden, self.placed, self.closed = [], [], [], [], False
+        self.freezes = []
 
     def place(self, work):
         self.placed.append(work)
@@ -85,6 +86,9 @@ class FakeDock:
 
     def set_hidden(self, hidden):
         self.hidden.append(hidden)
+
+    def set_freeze(self, seconds):
+        self.freezes.append(seconds)
 
     def close(self):
         self.closed = True
@@ -397,3 +401,10 @@ def test_qt_work_area_matches_screens_by_origin_not_name(qapp):
     elsewhere = MonitorInfo("any-device-name", "id", (-1920, -302, 0, 778), (-1920, -302, 0, 778), False)
     assert qt_work_area(here) == (0, 0, 800, 800)
     assert qt_work_area(elsewhere) is None
+
+
+def test_a_live_typing_freeze_change_reaches_the_dock(rig):
+    app, _, _, _, state = rig
+    dock = state["docks"][-1]
+    app._on_config(replace(app.cfg, decider=replace(app.cfg.decider, typing_freeze_ms=800)), [])
+    assert state["docks"][-1] is dock and dock.freezes == [0.8]  # the same dock, told the new freeze
