@@ -1,5 +1,5 @@
 # gazefocus/dock/window.py
-Verified against: GazeFocus@e017b50 · 2026-09-30
+Verified against: GazeFocus@948ff3a · 2026-09-30
 
 `DockWindow`: the Liquid Glass pill under the laptop camera, with the hover panel (spec §8) and the calibration's intro and result panels (spec §9).
 - **Never focused:**
@@ -18,7 +18,7 @@ Verified against: GazeFocus@e017b50 · 2026-09-30
   - Opening calls `on_panel(True)`, and the app turns the camera preview on.
   - Closing drops the last preview frame; `set_preview` is refused while the panel is closed.
 - **Clicks:**
-  - The collapsed pill: a ripple plus `on_toggle_pause`.
+  - The collapsed pill: a ripple plus `on_pill` (the app calibrates on "!", else pauses; it defaults to `on_toggle_pause`).
   - The open panel: only Pause/Resume and Recalibrate act.
   - The shadow never acts.
 - **Calibration panels** (modal):
@@ -26,6 +26,7 @@ Verified against: GazeFocus@e017b50 · 2026-09-30
   - Hover and leave never open or close them. Only their buttons act (`dock/modal.py`); a click anywhere else, even on the pill, does nothing.
   - `close_modal()` closes the pill; the next hover opens the hover panel again.
   - `panel_open` means the hover panel only; `on_panel` reports only its changes.
+- `pill_centre()`: the collapsed pill's centre on the desktop, where the calibration drop leaves from. `raise_to_top()`: `capture.keep_on_top`, back above the calibration overlay (native only).
 - `set_hidden`: hide without closing (locked, asleep, or under a fullscreen app). No grabs, no frames.
 - `set_freeze(seconds)`: a live `typing_freeze_ms` change, so the lid's melt still ends with the freeze.
 - `place(work)`: the top centre of a work area in Qt logical coordinates (see `app/main.py:qt_work_area`).

@@ -1,5 +1,5 @@
 # gazefocus/dock/view.py
-Verified against: GazeFocus@fd4a5d6 · 2026-09-30
+Verified against: GazeFocus@948ff3a · 2026-09-30
 
 What the dock should show (spec §8.2), derived from the app's state. Pure.
 
@@ -13,7 +13,7 @@ What the dock should show (spec §8.2), derived from the app's state. Pure.
 |---|---|---|
 | RUNNING | tracking | "No face, holding LG", "Frozen while typing" (inside the freeze) or "Focus: LG" / "Focus: Laptop" |
 | PAUSED / LOCKED / SUSPENDED | paused | "Paused" / "Screen locked" / "Asleep" |
-| CALIBRATING | idle | "Calibrating…" |
+| CALIBRATING | idle | "Calibrating…" / "follow the drop · Esc cancels" |
 | CAMERA_WAIT, NOT_CALIBRATED, LAYOUT_CHANGED, UNSUPPORTED, TRACKER_FAILED | alert | "Camera unavailable", "Not calibrated", … |
 
 - `blocked` = the decision is `blocked` for the reason category "typing".
