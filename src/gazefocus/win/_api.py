@@ -14,6 +14,7 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 dwmapi = ctypes.WinDLL("dwmapi", use_last_error=True)
 shell32 = ctypes.WinDLL("shell32", use_last_error=True)
 wtsapi32 = ctypes.WinDLL("wtsapi32", use_last_error=True)
+gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 
 LRESULT = ctypes.c_ssize_t
 LONG_PTR = ctypes.c_ssize_t
@@ -122,6 +123,22 @@ class SYSTEM_POWER_STATUS(ctypes.Structure):
     ]
 
 
+class BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [
+        ("biSize", wintypes.DWORD),
+        ("biWidth", wintypes.LONG),
+        ("biHeight", wintypes.LONG),
+        ("biPlanes", wintypes.WORD),
+        ("biBitCount", wintypes.WORD),
+        ("biCompression", wintypes.DWORD),
+        ("biSizeImage", wintypes.DWORD),
+        ("biXPelsPerMeter", wintypes.LONG),
+        ("biYPelsPerMeter", wintypes.LONG),
+        ("biClrUsed", wintypes.DWORD),
+        ("biClrImportant", wintypes.DWORD),
+    ]
+
+
 def _proto(fn, restype, *argtypes):
     fn.restype, fn.argtypes = restype, list(argtypes)
 
@@ -176,3 +193,17 @@ _proto(dwmapi.DwmGetWindowAttribute, ctypes.c_long, H, D, wintypes.LPVOID, D)
 _proto(shell32.SHQueryUserNotificationState, ctypes.c_long, ctypes.POINTER(ctypes.c_int))
 _proto(wtsapi32.WTSRegisterSessionNotification, B, H, D)
 _proto(wtsapi32.WTSUnRegisterSessionNotification, B, H)
+_proto(user32.SetWindowLongPtrW, LONG_PTR, H, ctypes.c_int, LONG_PTR)
+_proto(user32.SetWindowDisplayAffinity, B, H, D)
+_proto(user32.IsZoomed, B, H)
+_proto(user32.GetDC, wintypes.HDC, H)
+_proto(user32.ReleaseDC, ctypes.c_int, H, wintypes.HDC)
+_proto(gdi32.CreateCompatibleDC, wintypes.HDC, wintypes.HDC)
+_proto(gdi32.CreateDIBSection, wintypes.HBITMAP, wintypes.HDC, ctypes.POINTER(BITMAPINFOHEADER), U,
+       ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, D)
+_proto(gdi32.SelectObject, wintypes.HGDIOBJ, wintypes.HDC, wintypes.HGDIOBJ)
+_proto(gdi32.BitBlt, B, wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.HDC,
+       ctypes.c_int, ctypes.c_int, D)
+_proto(gdi32.DeleteObject, B, wintypes.HGDIOBJ)
+_proto(gdi32.DeleteDC, B, wintypes.HDC)
+_proto(dwmapi.DwmFlush, ctypes.c_long)
