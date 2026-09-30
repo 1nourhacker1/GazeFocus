@@ -227,3 +227,36 @@ def test_a_new_typing_freeze_reaches_the_lid(dock):
     d, clock, ticker, _ = dock
     d.set_freeze(0.8)
     assert d.scene.freeze_s == 0.8
+
+
+def move(d, x, y, enter=False):
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QEnterEvent, QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    p = QPointF(x, y)
+    ev = QEnterEvent(p, p, p) if enter else QMouseEvent(QEvent.MouseMove, p, p, Qt.NoButton, Qt.NoButton, Qt.NoModifier)
+    QApplication.sendEvent(d, ev)
+
+
+def test_the_hover_starts_only_over_the_pill_not_its_shadow(dock):
+    """The shadow reaches ~25 px below the pill: approaching through it must not start the 350 ms hover."""
+    d, clock, ticker, _ = dock
+    p = closed_pill(d)
+    move(d, p.cx, p.cy + p.hh + 10, enter=True)  # into the window, on the shadow
+    assert not d._hover.isActive()
+    move(d, p.cx, p.cy)  # onto the pill
+    assert d._hover.isActive()
+    move(d, p.cx, p.cy + p.hh + 10)  # back onto the shadow before it opened
+    assert not d._hover.isActive()
+
+
+def test_leaving_the_open_panel_onto_its_shadow_starts_closing(dock):
+    d, clock, ticker, _ = dock
+    d._hover.timeout.emit()
+    run_ticks(d, clock, ticker, 1.0)
+    pill = geometry.pill_at(1.0, CFG.scale, d.width())
+    move(d, pill.cx, pill.cy + pill.hh + 6)
+    assert d._leave.isActive()
+    move(d, pill.cx, pill.cy)
+    assert not d._leave.isActive()

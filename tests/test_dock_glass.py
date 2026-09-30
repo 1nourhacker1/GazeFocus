@@ -98,3 +98,12 @@ def test_luminance_is_between_0_and_1():
     pill = pill_at(0.0, SCALE, W / DPR).scaled(DPR)
     assert luminance(prepare(backdrop((255, 255, 255)), DPR, False), pill) == pytest.approx(1.0, abs=0.01)
     assert luminance(prepare(backdrop((0, 0, 0)), DPR, False), pill) == pytest.approx(0.0, abs=0.01)
+
+
+def test_invisible_shadow_pixels_let_clicks_through():
+    """Windows passes clicks through alpha 0 only: a faint, invisible shadow ring would swallow clicks on the tabs below."""
+    out, pill = glass(backdrop((200, 200, 200)))
+    a = out[..., 3].astype(int)
+    assert not ((a > 0) & (a < 8)).any()
+    assert (out[..., :3].astype(int) <= a[..., None]).all()  # still valid premultiplied pixels
+    assert out[int(pill.cy + pill.hh + 6 * DPR), int(pill.cx), 3] > 5  # the visible shadow stays

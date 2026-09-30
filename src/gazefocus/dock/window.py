@@ -57,6 +57,7 @@ class DockWindow(QWidget):
         super().__init__(None, flags)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setMouseTracking(True)  # hover follows the pill's shape, not the window's shadow
         self.cfg, self.clock = cfg, clock
         self.native = native and QGuiApplication.platformName() == "windows"  # never on the test platform
         self.on_toggle_pause, self.on_recalibrate, self.on_panel = on_toggle_pause, on_recalibrate, on_panel
@@ -288,10 +289,24 @@ class DockWindow(QWidget):
         self.on_panel(False)
         self._kick()
 
-    def enterEvent(self, e) -> None:
-        self._leave.stop()
-        if not self.panel_open:
+    def _pointer(self, x: float, y: float) -> None:
+        """Hover and leave follow the pill itself: the shadow around it doesn't count."""
+        inside = geometry.pill_at(self.openness.get(self.clock()), self.cfg.scale, self.width()).contains(x, y)
+        if self.panel_open:
+            if inside:
+                self._leave.stop()
+            elif not self._leave.isActive():
+                self._leave.start()
+        elif not inside:
+            self._hover.stop()
+        elif not self._hover.isActive():
             self._hover.start()
+
+    def enterEvent(self, e) -> None:
+        self._pointer(e.position().x(), e.position().y())
+
+    def mouseMoveEvent(self, e) -> None:
+        self._pointer(e.position().x(), e.position().y())
 
     def leaveEvent(self, e) -> None:
         self._hover.stop()

@@ -24,6 +24,7 @@ from gazefocus.dock.geometry import Pill
 LUMA = np.array([0.0722, 0.7152, 0.2126], np.float32)  # BGR weights
 DARK_BELOW, LIGHT_ABOVE = 0.45, 0.55  # the theme switch's hysteresis (spec §8.1)
 DARK_TINT = np.array([64, 58, 58], np.float32)  # rgb(58,58,64) as BGR
+INVISIBLE = 8 / 255  # below this the shadow can't be seen: made fully transparent
 
 
 @dataclass(frozen=True)
@@ -146,7 +147,8 @@ def render(
 
     shadow = 1 - (1 - box_shadow(off1, sig1, 0.22)) * (1 - box_shadow(1 * d, max(1 * d, step), 0.20))
     alpha = cov + shadow * (1 - cov)
+    seen = (alpha >= INVISIBLE).astype(np.float32)  # Windows lets clicks through alpha 0 only: no invisible ring
     rgba = np.empty(cov.shape + (4,), np.uint8)
-    rgba[..., :3] = np.clip(color * cov[..., None], 0, 255)
-    rgba[..., 3] = np.clip(alpha * 255, 0, 255)
+    rgba[..., :3] = np.clip(color * (cov * seen)[..., None], 0, 255)
+    rgba[..., 3] = np.clip(alpha * seen * 255, 0, 255)
     out[y0:y1, x0:x1] = rgba if step == 1 else cv2.resize(rgba, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR)
