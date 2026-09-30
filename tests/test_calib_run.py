@@ -103,3 +103,17 @@ def test_cancel_hides_everything_and_reports_nothing(qapp):
     assert got["done"] == [] and "DONE" not in got["cues"]
     run.cancel()  # twice is harmless
     assert overlay.hidden == 1
+
+
+def test_a_frame_that_fails_ends_the_run_with_a_failed_result(qapp):
+    run, clock, ticker, overlay, got = make(qapp)
+
+    def broken(frame, now):
+        raise RuntimeError("GDI said no")
+
+    overlay.show = broken
+    run.start()
+    clock.t += 1 / 60
+    ticker.tick.emit()
+    assert overlay.hidden == 1 and not ticker.running and not run.active  # nothing stays dimmed
+    assert len(got["done"]) == 1 and not got["done"][0].can_save and got["done"][0].title == "Calibration failed"

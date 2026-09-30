@@ -33,6 +33,7 @@ CUES = {"lg_travel": "LG", "lap_travel": "LAPTOP", "done": "DONE"}  # beeps: the
 SETTLE_S = 0.4  # a tour's first samples are the eyes catching up with the drop
 LOST_CARD_S = 0.3  # without a face this long, the card says so
 STALE_S = 1.0  # no sample for this long counts as no face (a camera that stopped)
+GIVE_UP_S = 20.0  # a tour waiting this long for a face ends the run (a busy camera, an empty chair)
 FADE_S = 0.25
 FRAME_60 = 1 / 60  # stretch is measured over one of the mockup's 60 Hz frames
 DIM_ON, DIM_OFF = 0.25, 0.62  # the screen to look at, the other one
@@ -102,6 +103,7 @@ class CalibrationSession:
         self.tau = 0.0  # timeline time: wall time minus the time tours stood waiting
         self._i = 0
         self._cancelled = False
+        self._gave_up = False
         self._face = False
         self._last_t: float | None = None
         self._lost_since = now
@@ -196,6 +198,8 @@ class CalibrationSession:
 
     def frame(self, now: float) -> OverlayFrame:
         self._advance(now)
+        if self.phase in TOURS and not self._face_now(now) and self._lost_for(now) >= GIVE_UP_S:
+            self._gave_up, self._i = True, len(PHASES)  # done: the result says why
         name = self.phase
         x, y = self._pos(self.tau)
         waiting = name in TOURS and not self._face_now(now)
@@ -226,6 +230,11 @@ class CalibrationSession:
     def result(self) -> CalibrationResult:
         samples = {k: list(v) for k, v in self._samples.items()}
         counts = {k: len(v) for k, v in samples.items()}
+        if self._gave_up:
+            return CalibrationResult(
+                None, samples, counts, None, "Couldn't see you",
+                f"No face for {GIVE_UP_S:.0f} s. Is the room too dark, or is another app using the camera?",
+            )
         if min(counts.values()) < MIN_CAL_SAMPLES:
             return CalibrationResult(
                 None, samples, counts, None, "Too few samples",

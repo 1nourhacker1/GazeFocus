@@ -196,3 +196,15 @@ def test_cancel_clears_the_screens():
 
 def test_beeps_mark_each_screen_and_the_end():
     assert CUES == {"lg_travel": "LG", "lap_travel": "LAPTOP", "done": "DONE"}
+
+
+def test_a_tour_gives_up_after_twenty_seconds_without_a_face():
+    from gazefocus.calib.session import GIVE_UP_S
+
+    s = session()
+    run(s, 0.0, 5.0)
+    s.on_sample(HeadSample(t=5.0, face=False))
+    assert s.frame(5.0 + GIVE_UP_S - 0.5).phase == "lg_tour"
+    assert s.frame(5.0 + GIVE_UP_S + 0.1).phase == "done"
+    r = s.result()
+    assert not r.can_save and r.title == "Couldn't see you"

@@ -215,7 +215,10 @@ class CardWindow(_Floating):
         self.img: QImage | None = None
         self._factory, self._grabber, self._grid, self._out = grabber_factory, None, None, None
         self._size = (CARD_MIN_W, 60.0)
-        self.resize(round(CARD_MIN_W + 2 * CARD_MARGIN), 120)
+        w, h = round(CARD_MIN_W + 2 * CARD_MARGIN), 120
+        sx, sy, sw, sh = screen
+        # created on its own screen, so its first render already has that screen's pixel ratio
+        self.setGeometry(round(sx + CARD_AT[0] * sw - w / 2), round(sy + CARD_AT[1] * sh - h / 2), w, h)
         self.setWindowOpacity(0.0)
 
     def set_card(self, card: Card | None, now: float) -> None:

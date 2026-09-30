@@ -123,3 +123,10 @@ def test_hide_closes_every_window_and_releases_the_grabbers(overlay):
 
 def test_keep_on_top_refuses_a_missing_window():
     assert keep_on_top(0) is False
+
+
+def test_each_card_window_starts_on_its_own_screen(overlay):
+    """So its first render already has that screen's pixel ratio (the laptop is 150 %, the LG 100 %)."""
+    for name, (x, y, w, h) in (("LG", LG), ("LAPTOP", LAP)):
+        c = overlay.cards[name].geometry().center()
+        assert x <= c.x() < x + w and y <= c.y() < y + h, name

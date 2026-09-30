@@ -5,11 +5,14 @@ paced by the display's refresh. The app owns the camera and feeds `on_sample`; t
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Callable
 
 from gazefocus.calib.path import Point, Rect
 from gazefocus.calib.session import CUES, CalibrationResult, CalibrationSession
+
+log = logging.getLogger(__name__)
 
 
 class CalibrationRun:
@@ -63,20 +66,27 @@ class CalibrationRun:
         self.active = False
         self.ticker.stop()
         self.ticker.close()
-        self.overlay.hide()
+        try:
+            self.overlay.hide()
+        except Exception:
+            log.exception("calibration overlay: hide failed")
 
     def _tick(self) -> None:
         self.ticker.handled()
         if not self.active:
             return  # a tick queued before cancel
-        now = self.clock()
-        frame = self.session.frame(now)
-        self.overlay.show(frame, now)
-        if frame.phase != self._phase:
-            self._phase = frame.phase
-            if frame.phase in CUES:
-                self.cue(CUES[frame.phase])
-        if frame.phase == "done":
-            result = self.session.result()
+        try:
+            now = self.clock()
+            frame = self.session.frame(now)
+            self.overlay.show(frame, now)
+            if frame.phase != self._phase:
+                self._phase = frame.phase
+                if frame.phase in CUES:
+                    self.cue(CUES[frame.phase])
+            result = self.session.result() if frame.phase == "done" else None
+        except Exception as e:  # never leave both screens dimmed: end the run and say why
+            log.exception("calibration frame failed")
+            result = CalibrationResult(None, title="Calibration failed", message=f"{type(e).__name__}: {e}")
+        if result is not None:
             self._stop()
             self.on_done(result)

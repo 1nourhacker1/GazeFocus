@@ -653,3 +653,98 @@ def test_a_dock_rebuilt_with_its_panel_open_turns_the_preview_off(rig):
     assert app.worker.preview_fps == 10.0
     app._on_config(replace(app.cfg, dock=replace(app.cfg.dock, refraction=False)), [])
     assert app.worker.preview_fps == 0.0
+
+
+def test_redo_with_a_monitor_gone_ends_the_calibration(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app._monitors_fn = lambda: [LAP]  # the LG drops out while the result shows
+    dock.press("redo")
+    assert not app.state.calibrating and dock.modal is None
+    app._set("paused", True)
+    assert not app.worker.running  # pause releases the camera again
+
+
+def test_a_layout_change_while_the_result_shows_closes_it(rig, qapp):
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app._monitors_fn = lambda: [LAP]
+    app._relayout()
+    assert dock.modal is None and not app.state.calibrating
+    assert calibration_path().read_text() == before
+
+
+@pytest.mark.parametrize("stage", ["intro", "result"])
+def test_a_dock_rebuilt_mid_calibration_shows_the_same_panel(rig, qapp, stage):
+    app, state = rig[0], rig[4]
+    app.recalibrate()
+    if stage == "result":
+        state["docks"][-1].press("start")
+        FakeRun.made[-1].finish(cal_result())
+    app._on_config(replace(app.cfg, dock=replace(app.cfg.dock, refraction=False)), [])
+    dock = state["docks"][-1]
+    assert dock.modal == stage
+    dock.press("start" if stage == "intro" else "save")
+    assert (FakeRun.made[-1].started if stage == "intro" else app.state.status is Status.RUNNING)
+
+
+def test_recalibrate_while_the_intro_is_up_shows_it_again(rig):
+    app, state = rig[0], rig[4]
+    app.recalibrate()
+    state["docks"][-1].close_modal()  # lost somehow (a hidden dock, a glitch)
+    app.recalibrate()
+    assert state["docks"][-1].modal == "intro"
+
+
+def test_an_unattended_saveable_result_is_saved_after_a_minute(rig, qapp):
+    from gazefocus.app.main import RESULT_TIMEOUT_S
+
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app.tick()
+    assert dock.modal == "result"  # not yet
+    app._result_t -= RESULT_TIMEOUT_S + 1
+    app.tick()
+    assert dock.modal is None and app.state.status is Status.RUNNING and calibration_path().exists()
+
+
+def test_an_unattended_result_that_cannot_be_saved_closes_after_a_minute(rig, qapp):
+    from gazefocus.app.main import RESULT_TIMEOUT_S
+
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result(1.0))
+    app._result_t -= RESULT_TIMEOUT_S + 1
+    app.tick()
+    assert dock.modal is None and app.state.status is Status.RUNNING
+    assert calibration_path().read_text() == before
+
+
+def test_locking_with_a_saveable_result_up_saves_it(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app._set("locked", True)
+    assert calibration_path().exists() and dock.modal is None
+    assert app.state.status is Status.LOCKED and not app.worker.running
+
+
+def test_a_camera_failure_during_a_run_cancels_it(rig, qapp):
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    app._on_camera_failed("could not open the camera")
+    assert run.cancelled and not app.state.calibrating
+    assert calibration_path().read_text() == before
+
+
+def test_the_tracker_giving_up_during_a_run_cancels_it(rig, qapp):
+    from gazefocus.app.state import MAX_TRACKER_FAILURES
+
+    app = running_app(rig)
+    app, dock, run = start_run(rig, qapp)
+    app.state.tracker_failures = MAX_TRACKER_FAILURES - 1
+    app._on_crashed("mediapipe exploded")
+    assert run.cancelled and app.state.status is Status.TRACKER_FAILED and not app.worker.running
