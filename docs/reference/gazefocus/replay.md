@@ -1,5 +1,5 @@
 # gazefocus/replay.py
-Verified against: GazeFocus@bf7feda · 2026-09-29
+Verified against: GazeFocus@beaa5d8 · 2026-09-30
 
 - **Recording format** (JSONL, one frame per line, **no video**): `{"sample": HeadSample fields, "ctx": Context fields}`, with `focus_zone` stored as a string.
 - `replay(frames, model, cfg)` runs a fresh `ZoneClassifier` and `GazeDecider`.
@@ -8,3 +8,4 @@ Verified against: GazeFocus@bf7feda · 2026-09-29
 - `summarize` prints one line per switch and one line per run of the same blocked category (numbers are ignored, so a typing run prints once).
 - Used by `gazefocus replay FILE` (Task 12) to tune thresholds against real behaviour without sitting at the desk.
 - Uses `logic.decider.reason_category` for collapsing runs.
+- Samples are written with `recordable()`: head angles and timings only, never face positions.
