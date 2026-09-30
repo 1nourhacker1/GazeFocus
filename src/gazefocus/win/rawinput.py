@@ -29,6 +29,7 @@ RI_KEY_BREAK = 0x0001
 USAGE_PAGE_GENERIC, USAGE_MOUSE, USAGE_KEYBOARD = 0x01, 0x02, 0x06
 HEADER_SIZE = ctypes.sizeof(_api.RAWINPUTHEADER)
 VK_MOUSE_BUTTONS = (0x01, 0x02, 0x04, 0x05, 0x06)  # left, right, middle, X1, X2
+VK_ESCAPE = 0x1B
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class RawEvent:
     key_down: bool = False
     moved: bool = False
     button_flags: int = 0  # RI_MOUSE_* bits: buttons and wheel
+    vkey: int = 0  # keyboard only: the virtual-key code
 
 
 def parse_raw_input(buf: bytes) -> RawEvent | None:
@@ -48,7 +50,7 @@ def parse_raw_input(buf: bytes) -> RawEvent | None:
     body = buf[HEADER_SIZE:]
     if header.dwType == RIM_TYPEKEYBOARD and len(body) >= ctypes.sizeof(_api.RAWKEYBOARD):
         kb = _api.RAWKEYBOARD.from_buffer_copy(body[: ctypes.sizeof(_api.RAWKEYBOARD)])
-        return RawEvent("key", injected, key_down=not (kb.Flags & RI_KEY_BREAK))
+        return RawEvent("key", injected, key_down=not (kb.Flags & RI_KEY_BREAK), vkey=kb.VKey)
     if header.dwType == RIM_TYPEMOUSE and len(body) >= ctypes.sizeof(_api.RAWMOUSE):
         m = _api.RAWMOUSE.from_buffer_copy(body[: ctypes.sizeof(_api.RAWMOUSE)])
         return RawEvent("mouse", injected, moved=bool(m.lLastX or m.lLastY), button_flags=m.usButtonFlags)
@@ -56,13 +58,18 @@ def parse_raw_input(buf: bytes) -> RawEvent | None:
 
 
 class InputTracker:
-    """Pure bookkeeping of the last real key press and mouse activity."""
+    """Pure bookkeeping of the last real key press and mouse activity.
 
-    def __init__(self) -> None:
+    `on_key(vkey)` hears every real key-down (calibration's Esc). It only listens: the key still
+    reaches the focused app.
+    """
+
+    def __init__(self, on_key: Callable[[int], None] | None = None) -> None:
         self.last_key_t: float | None = None
         self.last_mouse_t: float | None = None
         self.events = 0
         self.ignored = 0
+        self.on_key = on_key
 
     def on_event(self, t: float, ev: RawEvent) -> None:
         self.events += 1
@@ -71,6 +78,8 @@ class InputTracker:
             return
         if ev.kind == "key" and ev.key_down:
             self.last_key_t = t
+            if self.on_key is not None:
+                self.on_key(ev.vkey)
         elif ev.kind == "mouse" and (ev.moved or ev.button_flags):
             self.last_mouse_t = t
 

@@ -7,6 +7,7 @@ from gazefocus.win.rawinput import (
     RI_KEY_BREAK,
     RIM_TYPEKEYBOARD,
     RIM_TYPEMOUSE,
+    VK_ESCAPE,
     InputTracker,
     InputWatcher,
     RawEvent,
@@ -23,8 +24,8 @@ def raw(kind, device, body):
 def test_parse_key_down_and_up():
     down = parse_raw_input(raw(RIM_TYPEKEYBOARD, 0x1234, _api.RAWKEYBOARD(VKey=0x41, Flags=0)))
     up = parse_raw_input(raw(RIM_TYPEKEYBOARD, 0x1234, _api.RAWKEYBOARD(VKey=0x41, Flags=RI_KEY_BREAK)))
-    assert down == RawEvent("key", injected=False, key_down=True)
-    assert up == RawEvent("key", injected=False, key_down=False)
+    assert down == RawEvent("key", injected=False, key_down=True, vkey=0x41)
+    assert up == RawEvent("key", injected=False, key_down=False, vkey=0x41)
 
 
 def test_parse_mouse_move_and_injected_flag():
@@ -45,6 +46,22 @@ def test_tracker_ignores_injected_and_key_releases():
     t.on_event(3.0, RawEvent("key", injected=False, key_down=True))
     t.on_event(4.0, RawEvent("mouse", injected=False, button_flags=0x0400))  # wheel counts as mouse use
     assert (t.last_key_t, t.last_mouse_t) == (3.0, 4.0)
+
+
+def test_tracker_reports_real_key_downs_to_on_key():
+    keys = []
+    t = InputTracker(on_key=keys.append)
+    t.on_event(1.0, RawEvent("key", injected=False, key_down=True, vkey=VK_ESCAPE))
+    t.on_event(1.1, RawEvent("key", injected=False, key_down=False, vkey=VK_ESCAPE))  # the release
+    t.on_event(1.2, RawEvent("mouse", injected=False, moved=True))
+    assert keys == [VK_ESCAPE]
+
+
+def test_tracker_ignores_an_injected_escape():
+    keys = []
+    t = InputTracker(on_key=keys.append)
+    t.on_event(1.0, RawEvent("key", injected=True, key_down=True, vkey=VK_ESCAPE))
+    assert keys == [] and t.last_key_t is None
 
 
 def test_idle_seconds():
