@@ -77,7 +77,7 @@ def test_camera_that_stops_delivering_reports_failure(qapp):
                      on_crashed=print, max_missed_frames=5)
     w.start()
     assert wait_until(qapp, lambda: failed == ["the camera stopped delivering frames"])
-    assert cam.released
+    assert wait_until(qapp, lambda: cam.released)  # released in `finally`, just after the report
 
 
 def test_tracker_crash_is_reported_and_resources_released(qapp):
@@ -86,7 +86,7 @@ def test_tracker_crash_is_reported_and_resources_released(qapp):
                      on_crashed=crashed.append)
     w.start()
     assert wait_until(qapp, lambda: crashed == ["RuntimeError: mediapipe exploded"])
-    assert cam.released and tracker.closed
+    assert wait_until(qapp, lambda: cam.released and tracker.closed)  # in `finally`, just after the report
 
 
 def test_resuming_during_a_slow_open_does_not_revive_the_stopped_run(qapp):
