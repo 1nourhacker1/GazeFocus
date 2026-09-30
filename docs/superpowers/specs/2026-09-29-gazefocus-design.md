@@ -235,9 +235,10 @@ class Decision:
 
 ### 8.1 Visual design (approved: `mockups/dock-liquid-v2.html`)
 - **Placement:** top centre of the laptop's work area, 4 px below the top edge, directly under the camera. It doesn't move.
-- **Collapsed size:** **1.75×** the base 44×20, which is **77×35 logical px**. Pill-shaped.
+- **Collapsed size:** **1.75×** the base 44×20, then 1.5× bigger at the user's request (M0-C2, 2026-09-30): **115.5×52.5 logical px**. Pill-shaped.
 - **Material:** "Liquid Glass" imitation:
-  - backdrop blur of whatever is behind (Windows acrylic)
+  - backdrop blur of whatever is behind: blur(20px) saturate(1.7), self-captured (§8.5)
+  - a **lens rim**: content under the edge bends around it. On by default; `dock.refraction = false` turns it off (M0-C2)
   - a translucent fill
   - a specular top edge, rim light and soft shadow
 - **Glyph colours** (outlines, lid and pause bars) switch between dark and light based on the brightness *behind* the dock.
@@ -247,7 +248,7 @@ class Decision:
   - LG at (18,10,22,14), on the left and 4 units higher; laptop at (48,14,22,14).
   - **Both tiles share one base size.** The **focused tile scales to 1.18**, the other to 0.9, and both return to 1.0 when paused (the user asked for this).
 - **Water** fills the focused tile. It's green (#28A745 on light backgrounds, #30D158 on dark) with a small specular highlight.
-  Liquid merging is done with a signed-distance-field smooth-min in a fragment shader, the equivalent of the mockup's blur-and-threshold "goo" filter.
+  Liquid merging is done with a signed-distance-field smooth-min (in the CPU renderer, §8.5), the equivalent of the mockup's blur-and-threshold "goo" filter.
 
 ### 8.2 States and cues (shape as well as colour)
 | State | Visual |
@@ -279,21 +280,26 @@ class Decision:
   - **Pause/Resume** and **Recalibrate** buttons
 - **Clicking the pill area** toggles pause, with a ripple.
 
-### 8.5 Implementation
-- A frameless `QQuickWindow` with `Qt.Tool | FramelessWindowHint | WindowStaysOnTopHint | WindowDoesNotAcceptFocus`.
-- Win32 styles `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST`, plus `WM_MOUSEACTIVATE → MA_NOACTIVATE`.
-  **The dock must never become the foreground window.**
-- **Acrylic behind a pill shape:** `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW)` plus a window region.
-  The fallback is `SetWindowCompositionAttribute(ACCENT_ENABLE_ACRYLICBLURBEHIND)`. The final fallback is a frosted fill with no real blur.
-  **Which one works is decided by spike M0-C.**
-  **M0-C result (2026-09-29): none of them.**
-  - Qt makes translucent windows layered, so DWM and accent blur never show, and `SetWindowRgn` gives boxy edges.
-  - The focus handling and the ~60 fps resize animation both passed.
-  - Plan 3 starts with spike **M0-C2**: capture the small area behind the dock ourselves (excluded from capture), then blur and refract it in a Qt Quick shader. This also makes Apple-style refraction possible. The fallback is a WebView with system acrylic.
-  - See `docs/spikes/m0c-glass-dock.md`.
-- **Expanding:** the window is sized to the panel's maximum size, the pill is drawn inside it, and the region or hit-test
-  follows the animated shape (mouse clicks outside the pill fall through to the windows underneath).
-- **GPU cost:** Qt Quick renders on the GPU only while an animation runs. When idle there are zero frames.
+### 8.5 Implementation (M0-C2, 2026-09-30)
+- **Window:** a frameless, translucent `QWidget` with `Qt.Tool | FramelessWindowHint | WindowStaysOnTopHint | WindowDoesNotAcceptFocus` and `WA_ShowWithoutActivating`.
+  - Win32 styles `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST`, plus `WM_MOUSEACTIVATE → MA_NOACTIVATE`.
+  - **The dock must never become the foreground window.**
+- **The glass is rendered by us**, because M0-C showed that DWM and accent blur never show behind Qt's layered windows.
+  1. The dock excludes itself from capture with `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`.
+  2. It grabs the pixels behind it with a GDI `BitBlt`, about 7 times a second, and renders a frame only when they changed.
+  3. It renders the blur, saturation, tint, highlights, shadow and lens rim with numpy and OpenCV.
+  4. Qt presents the result with per-pixel alpha (`UpdateLayeredWindow`). There's no window region, so the edges are antialiased, and pixels with alpha 0 let clicks through.
+- **Clock:** during an animation, frames are paced by `DwmFlush` on a helper thread, at the display refresh (240 Hz on this laptop). Qt's 60 Hz animation timer looked choppy (M0-C2).
+- **Caching:**
+  - Blurs and luminance are computed once per backdrop change.
+  - The glass is cached per shape and theme, so a water switch only redraws the glyph.
+  - While the panel resizes, the glass renders at half resolution, then one full-resolution frame follows.
+  - No grabs run while something moves.
+- **Expanding:** the window is sized to the panel's maximum, and the pill is drawn inside it.
+- See `docs/spikes/m0c-glass-dock.md` and `docs/spikes/m0c2-liquid-glass.md`.
+- **CPU cost:**
+  - When idle, there are zero frames. There's only a 4–6 ms screen grab about 7 times a second, to notice changes behind the dock.
+  - An animation costs 2–5 ms a frame, for half a second.
 
 ## 9. Calibration (approved: `mockups/calibration.html`, guidance "follow the drop")
 
@@ -468,3 +474,6 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Camera hand-over for calls (Plan 2) | Manual pause (Ctrl+Alt+G / tray) | Auto-yield to call apps; Windows multi-app camera setting |
 | Focus after using the tray menu (Plan 2) | Return focus to the last app window | Leave it on the taskbar |
 | Recalibrate without both monitors (Plan 2 final review) | Refused in the app; a mid-run layout change isn't saved | Save a one-monitor calibration over the good one |
+| Dock renderer (M0-C2) | CPU: self-captured backdrop, numpy/OpenCV glass, per-pixel alpha, DwmFlush clock | Qt Quick shader; WebView acrylic |
+| Dock size (M0-C2, user) | Pill 1.5× bigger (115.5×52.5); panel stays 300×158 | 77×35 |
+| Lens rim (M0-C2) | On by default, config switch | Off |

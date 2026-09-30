@@ -7,7 +7,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 
 | Area | Status | Verified against |
 |---|---|---|
-| `superpowers/specs/` | Design. §7.3 and §12 updated with the M0-B result (2026-09-30). §6, §7.4, §8.5, §10 and §15 were amended after Plan 1; §5, §7.1, §7.4, §12.3 and §15 again after Plan 2, and the header, §4.5, §9 and §15 after its final review (2026-09-29). §4 and §7 are implemented, unit-tested and accepted at the desk (2026-09-30); §8 and §9 (the dock and overlay) wait for Plan 3 | — |
+| `superpowers/specs/` | Design. §8 amended with the M0-C2 result, and §7.3 and §12 with M0-B (2026-09-30). §6, §7.4, §8.5, §10 and §15 were amended after Plan 1; §5, §7.1, §7.4, §12.3 and §15 again after Plan 2, and the header, §4.5, §9 and §15 after its final review (2026-09-29). §4 and §7 are implemented, unit-tested and accepted at the desk (2026-09-30); §8 and §9 (the dock and overlay) wait for Plan 3 | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
 | `reference/gazefocus/` | Code-verified per file (see each `Verified against`) | per file |
 | `spikes/` | Hardware spike results, pasted from real runs | per file |
@@ -33,6 +33,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/viewer.py](reference/gazefocus/viewer.md)
 - [M0-A: tracking](spikes/m0a-tracking.md)
 - [M0-C: glass pill dock](spikes/m0c-glass-dock.md)
+- [M0-C2: self-rendered Liquid Glass dock](spikes/m0c2-liquid-glass.md)
 - [gazefocus/config.py](reference/gazefocus/config.md)
 - [gazefocus/logic/classifier.py](reference/gazefocus/logic/classifier.md)
 - [gazefocus/logic/decider.py](reference/gazefocus/logic/decider.md)
