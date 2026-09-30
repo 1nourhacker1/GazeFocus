@@ -215,7 +215,7 @@ class Decision:
 3. `SetForegroundWindow(hwnd)`, then check that `GetForegroundWindow() == hwnd` within 50 ms.
 4. If that fails, on a worker thread with a **500 ms timeout**: `AttachThreadInput`, then `BringWindowToTop` +
    `SetForegroundWindow`, then detach. The timeout matters because `AttachThreadInput` can deadlock.
-5. If that fails too, log `FAIL`, shake the dock once, and **don't retry this switch**. Elevated windows (UIPI) end up here.
+5. If that fails too, log `FAIL`, shake the dock once, and **don't retry this switch**. That covers a focus lock or a hung window. **M0-B (2026-09-30):** elevated windows do *not* end up here. The direct path focused the elevated Task Manager, and switched away from it, in 7 ms from medium integrity.
 6. On success: warp the cursor (§4.3), log the decision, and start `post_switch_cooldown`.
 
 ### 7.4 Other system hooks
@@ -378,7 +378,7 @@ class Decision:
 | Camera busy or unplugged | Release it, show "camera off", retry every 5 s, resume on its own |
 | Lock or sleep | Release the camera immediately; reopen on unlock or resume |
 | Target window closed or frozen | Take the next MRU entry and never wait on it (no `SendMessage` to the target) |
-| Focus refused (e.g. an elevated window) | Fallback chain (§7.3), then one `FAIL` log line and a dock shake. No retry loop. |
+| Focus refused (e.g. a focus lock or a hung window) | Fallback chain (§7.3), then one `FAIL` log line and a dock shake. No retry loop. |
 | Tracker thread exception | Log it and restart after 2 s. After 3 consecutive failures the dock shows "!". |
 | Not calibrated or layout changed | No switching; the dock shows "!" and offers calibration |
 | More than 2 monitors | "Unsupported layout" state; no switching |
@@ -410,7 +410,7 @@ class Decision:
 6. Lean down to a phone (face lost) → focus held and the dock shows evaporation.
 7. A Teams or camera app grabs the camera → "camera off", then it resumes afterwards.
 8. Lock and unlock → the camera light goes off, then tracking resumes.
-9. An elevated window as the target → one `FAIL` line and a shake, with no hang.
+9. An elevated window (Task Manager) on either screen: switching to it and away from it works, with no hang (M0-B showed this). A refused switch gives one `FAIL` line and a shake.
 10. `--bench` over 10 minutes → CPU under 2% and RSS under 300 MB. Typing latency feels unchanged.
 
 ## 13. Tech stack and repo layout
