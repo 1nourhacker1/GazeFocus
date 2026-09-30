@@ -1,5 +1,5 @@
 # gazefocus/calib/session.py
-Verified against: GazeFocus@d42586a · 2026-09-30
+Verified against: GazeFocus@e017b50 · 2026-09-30
 
 One run of the "follow the drop" calibration (spec §9). Pure: time comes in, frames come out.
 The app feeds it the tracking camera's samples (`on_sample`) and asks for a frame on every vsync (`frame(now)`); the overlay (`calib/overlay.py`) draws the frame. Both clocks are `time.perf_counter`, like `HeadSample.t`.
@@ -28,7 +28,7 @@ The app feeds it the tracking camera's samples (`on_sample`) and asks for a fram
 - **`CUES`:** the beeps the app plays when a phase begins. `lg_travel` → LG (1), `lap_travel` → LAPTOP (2), `done` → DONE (3).
 - **`result() -> CalibrationResult(model, samples, counts, quality, title, message)`:**
   - Fewer than `MIN_CAL_SAMPLES` (40) on either screen: "Too few samples", no model.
-  - `fit_zone_model` fails, or the quality is "too close": "Too close", with the message "Too close. Turn your head a little more, or move the LG closer to the laptop."
+  - `fit_zone_model` fails, or the quality is "too close": the title "Too close" and the message "Turn your head a little more, or move the LG closer to the laptop." (the panel shows them apart; together they read as the plan's sentence).
   - Otherwise "Calibrated ✓", with the hint "Look at each screen: the water should follow."
   - `can_save` is true only for a model that isn't too close.
 - The laptop leg travels to the laptop's centre, where its tour begins; the mockup's (.5, .55) would make the drop jump 53 px at the tour's start (Plan 4 ruling).

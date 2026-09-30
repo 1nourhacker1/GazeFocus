@@ -1,7 +1,7 @@
 # gazefocus/dock/window.py
-Verified against: GazeFocus@8db716d · 2026-09-30
+Verified against: GazeFocus@e017b50 · 2026-09-30
 
-`DockWindow`: the Liquid Glass pill under the laptop camera, with the hover panel (spec §8).
+`DockWindow`: the Liquid Glass pill under the laptop camera, with the hover panel (spec §8) and the calibration's intro and result panels (spec §9).
 - **Never focused:**
   - Qt: `Tool | FramelessWindowHint | WindowStaysOnTopHint | WindowDoesNotAcceptFocus` and `WA_ShowWithoutActivating`
   - Win32: `make_noactivate` and `WM_MOUSEACTIVATE → MA_NOACTIVATE`
@@ -21,6 +21,11 @@ Verified against: GazeFocus@8db716d · 2026-09-30
   - The collapsed pill: a ripple plus `on_toggle_pause`.
   - The open panel: only Pause/Resume and Recalibrate act.
   - The shadow never acts.
+- **Calibration panels** (modal):
+  - `show_intro(on_start, on_cancel)` and `show_result(result, on_save, on_redo)` open the pill to that panel (`geometry.PANELS`). If the hover panel is open, the pill morphs from its size in 0.52 s, and its camera preview stops (`on_panel(False)`).
+  - Hover and leave never open or close them. Only their buttons act (`dock/modal.py`); a click anywhere else, even on the pill, does nothing.
+  - `close_modal()` closes the pill; the next hover opens the hover panel again.
+  - `panel_open` means the hover panel only; `on_panel` reports only its changes.
 - `set_hidden`: hide without closing (locked, asleep, or under a fullscreen app). No grabs, no frames.
 - `set_freeze(seconds)`: a live `typing_freeze_ms` change, so the lid's melt still ends with the freeze.
 - `place(work)`: the top centre of a work area in Qt logical coordinates (see `app/main.py:qt_work_area`).

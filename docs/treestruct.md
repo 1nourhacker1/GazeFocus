@@ -75,3 +75,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/calib/path.py](reference/gazefocus/calib/path.md)
 - [gazefocus/calib/session.py](reference/gazefocus/calib/session.md)
 - [gazefocus/calib/overlay.py](reference/gazefocus/calib/overlay.md)
+- [gazefocus/dock/modal.py](reference/gazefocus/dock/modal.md)
