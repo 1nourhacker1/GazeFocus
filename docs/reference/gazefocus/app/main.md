@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@948ff3a · 2026-09-30
+Verified against: GazeFocus@362439b · 2026-09-30
 
 `run_app()`:
 1. DPI awareness.
@@ -26,10 +26,15 @@ Verified against: GazeFocus@948ff3a · 2026-09-30
   - **Done** (`_run_done`): the dock shows the **result** panel. A saveable result also gets a live **preview**: a `ZoneClassifier` on the new model moves the dock's water, but nothing switches.
   - **Save:** `commit_calibration` with the worker's camera `backend`, then `refresh_layout`. **Redo:** a new run, without the intro.
   - Without a dock, the run starts at once, and a saveable result is saved directly.
+- **Every exit ends it** (final-review fixes):
+  - A Redo that finds a monitor gone ends the calibration, rather than staying in CALIBRATING.
+  - A rebuilt dock (config reload) shows the same intro or result, and Recalibrate re-shows a lost one.
+  - A result left alone for `RESULT_TIMEOUT_S` (60 s), or pause, lock or sleep while it's up (`_settle_result`), is **saved** if it can be; otherwise it's dropped. Esc still discards it.
+  - A camera failure mid-run cancels the run with a notification. The tracker's 3rd crash cancels it too, so there's no restart loop while calibrating.
 - **Guards and cancels** (`cancel_calibration`; the previous calibration always stays):
   - Refused unless exactly 2 monitors are present and both screens are found (a tray notification).
   - **Esc** (only listening: the focused app gets it too), **Not now**, and pause, lock or sleep (`_set(flag, True)`).
-  - A **layout change** mid-run cancels it, with a notification (`_relayout`). A change between the run and Save means nothing is saved.
+  - A **layout change** mid-run, or while the result shows, cancels it with a notification (`_relayout`). A change detected only at Save means nothing is saved.
 
 **`refresh_layout()`:**
 - Exactly 2 monitors are required, otherwise "unsupported".

@@ -1,5 +1,5 @@
 # gazefocus/calib/session.py
-Verified against: GazeFocus@e017b50 · 2026-09-30
+Verified against: GazeFocus@362439b · 2026-09-30
 
 One run of the "follow the drop" calibration (spec §9). Pure: time comes in, frames come out.
 The app feeds it the tracking camera's samples (`on_sample`) and asks for a frame on every vsync (`frame(now)`); the overlay (`calib/overlay.py`) draws the frame. Both clocks are `time.perf_counter`, like `HeadSample.t`.
@@ -24,6 +24,7 @@ The app feeds it the tracking camera's samples (`on_sample`) and asks for a fram
 - **Waiting for the face:**
   - A tour's clock stops while the latest sample has no face, or no sample has arrived for `STALE_S` (1 s: a camera that stopped).
   - Before the first sample, there's no face yet, so the camera may take its time to open.
+  - After `GIVE_UP_S` (20 s) of waiting, the run ends (`done`), and the result is "Couldn't see you" / "No face for 20 s. Is the room too dark, or is another app using the camera?" (final-review fix: a busy camera meant an endless wait).
 - **Sampling:** only face samples, only during tours, only after the tour's first `SETTLE_S` (0.4 s of timeline). That's about 72 per screen at 15 fps.
 - **`CUES`:** the beeps the app plays when a phase begins. `lg_travel` → LG (1), `lap_travel` → LAPTOP (2), `done` → DONE (3).
 - **`result() -> CalibrationResult(model, samples, counts, quality, title, message)`:**

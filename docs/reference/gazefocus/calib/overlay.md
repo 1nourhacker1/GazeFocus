@@ -1,5 +1,5 @@
 # gazefocus/calib/overlay.py
-Verified against: GazeFocus@5177339 · 2026-09-30
+Verified against: GazeFocus@362439b · 2026-09-30
 
 The calibration overlay (spec §9): dimmed screens, the drop and its progress ring, and the cards. The session (`calib/session.py`) decides where everything is; this module only draws an `OverlayFrame`, with the mockup's CSS transitions turned into time-based fades.
 
@@ -27,6 +27,7 @@ The calibration overlay (spec §9): dimmed screens, the drop and its progress ri
   - **Text:** white, the title 15 px bold, the subtitle 12 px at .8, 3 px apart.
   - **Glass:** a grab of what's behind it, rendered as dark glass by `glass.render(dark=True, openness=0.26)`: a tint of about .42, the mockup's rgba(40,40,48,.42). Radius 20.
   - **Animation:** it fades in over 0.35 s while rising from translate −44 % and scale .96 to −50 % and 1, with a 0.5 s spring (cubic-bezier(.3,1.4,.5,1)). It fades out in reverse.
+  - Each card window is created centred on its own screen, so its first render already has that screen's pixel ratio (laptop 150 %, LG 100 %; final-review fix).
   - A new card on a visible window swaps its content in place. `close()` releases the grabber.
 - **`Overlay(screens, native, grabber_factory, refraction)`:**
   - `open()` creates and shows every window.
