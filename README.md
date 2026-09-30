@@ -2,15 +2,20 @@
 
 Webcam "focus follows gaze" for a two-monitor Windows desk. Look at a screen, and keyboard focus goes to the last window you used there. A Liquid Glass status dock sits under the laptop camera.
 
-**Status: Plan 3 of 4: the Liquid Glass dock (accepted at the desk 2026-09-30).** `gazefocus run` is the real app: focus follows your gaze, and the dock under the laptop camera shows what it's doing. Plan 4 adds the calibration overlay.
+**Status: Plan 4 of 4: the "follow the drop" calibration (built 2026-09-30; the desk check is next).** `gazefocus run` is the real app: focus follows your gaze, the dock under the laptop camera shows what it's doing, and Recalibrate guides you with a glowing drop.
 
 ## Using it
 - Start it with `uv run gazefocus run`. A two-tile icon appears in the tray (possibly under the ^ overflow arrow).
 - **Before a video call, press Ctrl+Alt+G** (or tray → Pause). This webcam can't be shared, so pausing releases it. Press it again afterwards.
 - **The dock** sits under the laptop camera. The bigger tile holds the water: that's where focus is. Amber water under a lid means frozen while you type; steam means no face; bars mean paused; "!" means something needs you.
-  - **Hover** it for the live camera preview, the numbers, and Pause/Recalibrate. **Click** it to pause.
+  - **Hover** it for the live camera preview, the numbers, and Pause/Recalibrate. **Click** it to pause (or, when it shows "!" because there's no calibration, to calibrate).
   - It never takes focus, and it hides under fullscreen apps and while the screen is locked.
-- **Recalibrate** is in the tray. Listen for the beeps: 1 = look at the LG, 2 = the laptop, 3 = done.
+- **Recalibrate** (the tray, or the dock's panel; it opens by itself the first time):
+  - The dock asks first: **Start** or **Not now**.
+  - The screens dim, and a green drop tours the LG, then the laptop. Follow it with your eyes and turn your head naturally (about 17 s). It waits if it can't see your face.
+  - The beeps still mark each step: 1 = the LG, 2 = the laptop, 3 = done.
+  - The dock then shows the result: the samples, the separation, and the water already following the new calibration. **Save** or **Redo**.
+  - **Esc** cancels at any point, and so do pausing and locking the screen. The previous calibration is kept.
 - Logs are in `%APPDATA%\GazeFocus\logs`. `decisions.log` has one line per switch or block.
 
 ## Setup

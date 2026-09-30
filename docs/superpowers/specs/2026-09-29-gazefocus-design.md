@@ -334,6 +334,20 @@ class Decision:
    - The app refuses Recalibrate with anything other than 2 monitors.
    - It doesn't save a result if the layout changed during the run, so the good calibration can't be replaced by a one-monitor one.
    - `calibrate-cli` still allows one monitor, for dry-run use (Plan 1).
+9. **As built (Plan 4, 2026-09-30):**
+   - **Triggers:** the tray, the hover panel's Recalibrate, a click on the dock's "!" (not calibrated or layout changed), and the first start. Every trigger opens the intro first. **Redo** skips the intro.
+   - **Camera:** the samples come from the tracking camera, which stays on (or starts) at the full `camera.fps` while calibrating. Nothing switches meanwhile.
+   - **The beeps are kept** (1 = LG, 2 = laptop, 3 = done), because the user may be looking at the other screen. They play off the UI thread.
+   - **Timeline:** 420 ms, then for each screen: travel 1100 ms, the card (1300 / 1200 ms), the tour 5200 ms. Then 700 ms back to the dock, and 600 ms of fade. That's about 17 s.
+     - A tour's clock stands still while no face is seen, or no camera frame has arrived for 1 s. After 0.3 s the card says *"Can't see you / Is the room too dark?"*
+     - The laptop leg ends at the laptop's centre, where its tour begins (the mockup's (.5, .55) would make the drop jump).
+   - **Overlay:** a black dim window per monitor with only its window opacity animated; one small per-pixel-alpha window for the drop and ring, moved each frame; a dark-glass card window per monitor. The drop and cards are excluded from capture. The dock is lifted back above them.
+   - **Result panel:**
+     - The scatter fits its axes to the samples, with the LG always on the left.
+     - The dashed line is the fitted model's real boundary.
+     - A saveable result gets a live preview: the dock's water follows the new model before Save, as the hint promises.
+   - **Can't save:** too close gives only **Redo** ("Too close" / "Turn your head a little more, or move the LG closer to the laptop."). Fewer than 40 samples per screen: "Too few samples", with the counts.
+   - **Cancels:** Esc (even on the result panel), Not now, pause, lock, sleep, and a layout change mid-run. The layout fingerprint is checked again at Save.
 
 ## 10. Configuration and files (`%APPDATA%\GazeFocus\`)
 
@@ -485,3 +499,8 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Typing lid timing (Plan 3) | Holds 0.3 s, then melts until the freeze ends | Melts over 1.5 s after typing stops |
 | Dock over fullscreen apps (Plan 3) | Hidden | Always on top |
 | Calibration overlay | Plan 4 | Plan 3 |
+| Calibration samples (Plan 4) | The tracking camera, into a Qt-thread session (the drop reacts to each frame) | A separate calibration thread with its own camera (Plan 2's `CalibrationJob`, removed) |
+| Calibration cues (Plan 4) | Overlay **and** the beeps | Overlay only |
+| No face during a tour (Plan 4) | The drop waits; the card asks after 0.3 s | Keep touring and collect fewer samples |
+| Result preview (Plan 4) | The dock's water follows the new model before Save | Static result |
+| A double-click on the dock (Plan 4) | One click | Two toggles |
