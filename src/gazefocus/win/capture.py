@@ -17,6 +17,8 @@ WDA_EXCLUDEFROMCAPTURE = 0x11
 SRCCOPY, CAPTUREBLT = 0x00CC0020, 0x40000000
 GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST = 0x08000000, 0x00000080, 0x00000008
+HWND_TOPMOST = -1
+SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE = 0x0001, 0x0002, 0x0010
 
 
 class Grabber:
@@ -57,6 +59,11 @@ def make_noactivate(hwnd: int) -> None:
     """The dock must never become the foreground window (spec §8.5)."""
     ex = _api.user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
     _api.user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST)
+
+
+def keep_on_top(hwnd: int) -> bool:
+    """Lift a topmost window above the topmost windows shown after it (the dock above the calibration overlay)."""
+    return bool(_api.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE))
 
 
 def dwm_flush() -> None:
