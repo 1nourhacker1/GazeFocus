@@ -66,3 +66,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/dock/geometry.py](reference/gazefocus/dock/geometry.md)
 - [gazefocus/dock/glass.py](reference/gazefocus/dock/glass.md)
 - [gazefocus/dock/glyph.py](reference/gazefocus/dock/glyph.md)
+- [gazefocus/dock/panel.py](reference/gazefocus/dock/panel.md)
