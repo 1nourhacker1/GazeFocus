@@ -348,6 +348,11 @@ class Decision:
      - A saveable result gets a live preview: the dock's water follows the new model before Save, as the hint promises.
    - **Can't save:** too close gives only **Redo** ("Too close" / "Turn your head a little more, or move the LG closer to the laptop."). Fewer than 40 samples per screen: "Too few samples", with the counts.
    - **Cancels:** Esc (even on the result panel), Not now, pause, lock, sleep, and a layout change mid-run. The layout fingerprint is checked again at Save.
+   - **Every exit ends it** (Plan 4 final review):
+     - 20 s without a face ends a tour with "Couldn't see you".
+     - A camera failure, or the tracker's 3rd crash, cancels the run.
+     - A result left alone for 60 s, or interrupted by pause, lock or sleep, is **saved** if it can be (Esc discards it).
+     - A config reload that rebuilds the dock shows the same panel again.
 
 ## 10. Configuration and files (`%APPDATA%\GazeFocus\`)
 
