@@ -408,3 +408,15 @@ def test_a_live_typing_freeze_change_reaches_the_dock(rig):
     dock = state["docks"][-1]
     app._on_config(replace(app.cfg, decider=replace(app.cfg.decider, typing_freeze_ms=800)), [])
     assert state["docks"][-1] is dock and dock.freezes == [0.8]  # the same dock, told the new freeze
+
+
+def test_no_face_since_the_camera_started_still_shows_no_face(rig):
+    """A closed privacy shutter, or nobody in view at resume: the first sample starts the no-face clock."""
+    app, _, _, _, state = rig
+    dock = state["docks"][-1]
+    calibrate_fake()
+    app.refresh_layout()
+    app.apply()  # the camera starts: nothing seen yet
+    app._on_sample(HeadSample(time.perf_counter() - 0.6, False))  # the first frame, 0.6 s ago: nobody
+    app._on_sample(HeadSample(time.perf_counter(), False))
+    assert dock.views[-1].face is False

@@ -214,8 +214,8 @@ class GazeFocusApp:
 
     def _on_sample(self, sample: HeadSample) -> None:
         self._last_sample = sample
-        if sample.face:
-            self._face_t = sample.t
+        if sample.face or self._face_t is None:  # a face, or the first frame since the camera started
+            self._face_t = sample.t  # (so "nobody in view since the start" also becomes "no face" after 0.5 s)
         if self.state.switching and self.controller is not None:
             self.controller.on_sample(sample)
         self._update_dock()
