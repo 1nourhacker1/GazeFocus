@@ -150,10 +150,33 @@ def is_fullscreen(f: WindowFacts, rect: tuple[int, int, int, int], monitor: tupl
     return covers(rect, monitor)
 
 
-def fullscreen_app_on(device: str, monitor: tuple[int, int, int, int]) -> bool:
-    hwnd = _api.user32.GetForegroundWindow() or 0
-    f = window_facts(hwnd)
+def window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
     r = wintypes.RECT()
-    if not f.exists or not _api.user32.GetWindowRect(hwnd, ctypes.byref(r)):
-        return False
-    return is_fullscreen(f, (r.left, r.top, r.right, r.bottom), monitor, device, bool(_api.user32.IsZoomed(hwnd)))
+    if not _api.user32.GetWindowRect(hwnd, ctypes.byref(r)):
+        return None
+    return r.left, r.top, r.right, r.bottom
+
+
+def fullscreen_app_on(
+    device: str,
+    monitor: tuple[int, int, int, int],
+    *,
+    zorder: Callable[[], Sequence[int]] = top_level_windows,
+    facts_of: Callable[[int], WindowFacts] = window_facts,
+    rect_of: Callable[[int], "tuple[int, int, int, int] | None"] = window_rect,
+    zoomed_of: Callable[[int], bool] = lambda hwnd: bool(_api.user32.IsZoomed(hwnd)),
+) -> bool:
+    """The topmost real window on `device` is fullscreen, whether or not it has focus.
+
+    GazeFocus moves focus to the other screen whenever the user looks there, so a fullscreen video
+    on the laptop is usually *not* the foreground window. Hidden, minimized, cloaked, tool, shell
+    and GazeFocus's own windows are skipped.
+    """
+    for hwnd in zorder():
+        f = facts_of(hwnd)
+        if (not f.exists or not f.visible or f.minimized or f.cloaked or f.tool_window or f.own_process
+                or f.class_name in SHELL_CLASSES or f.device != device):
+            continue
+        rect = rect_of(hwnd)
+        return rect is not None and is_fullscreen(f, rect, monitor, device, zoomed_of(hwnd))
+    return False

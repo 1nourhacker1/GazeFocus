@@ -6,6 +6,7 @@ from gazefocus.win.windows import (
     WindowFacts,
     choose_target,
     covers,
+    fullscreen_app_on,
     is_fullscreen,
     is_switch_target,
     top_level_windows,
@@ -106,3 +107,29 @@ def test_a_borderless_window_over_the_monitor_is_fullscreen():
 )
 def test_what_is_not_fullscreen(facts, rect, zoomed):
     assert not is_fullscreen(facts, rect, MON, LAP, zoomed)
+
+
+def z_desktop(*windows):
+    """A fake Z-order: (hwnd, facts, rect, zoomed), topmost first."""
+    table = {h: (f, r, z) for h, f, r, z in windows}
+    return dict(zorder=lambda: [h for h, *_ in windows], facts_of=lambda h: table[h][0],
+                rect_of=lambda h: table[h][1], zoomed_of=lambda h: table[h][2])
+
+
+def test_a_fullscreen_video_on_the_laptop_counts_while_focus_is_on_the_lg():
+    """GazeFocus itself moves focus to the LG: the laptop's fullscreen video is then not the foreground."""
+    fake = z_desktop(
+        (1, good(1, device=LG), (-1920, -302, 0, 778), False),  # the focused LG window (topmost overall)
+        (2, good(2, device=LAP), (0, 0, 2560, 1600), False),  # the fullscreen video on the laptop
+    )
+    assert fullscreen_app_on(LAP, MON, **fake)
+
+
+def test_the_topmost_real_window_on_the_monitor_decides():
+    tool = good(3, device=LAP, tool_window=True)  # e.g. a small always-on-top helper: ignored
+    ours = good(4, device=LAP, own_process=True)  # the dock itself: ignored
+    video = (2, good(2, device=LAP), (0, 0, 2560, 1600), False)
+    assert fullscreen_app_on(LAP, MON, **z_desktop((3, tool, (10, 10, 50, 50), False), (4, ours, (0, 0, 332, 178), False), video))
+    editor = (5, good(5, device=LAP), (100, 100, 1500, 900), False)  # a normal window over the video
+    assert not fullscreen_app_on(LAP, MON, **z_desktop(editor, video))
+    assert not fullscreen_app_on(LAP, MON, **z_desktop((1, good(1, device=LG), (-1920, -302, 0, 778), False)))
