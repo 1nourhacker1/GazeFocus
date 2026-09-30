@@ -21,7 +21,8 @@ from gazefocus.app.state import MAX_TRACKER_FAILURES, AppState, Status
 from gazefocus.app.tray import Tray
 from gazefocus.app.workers import CalibrationJob, CalibrationOutcome, CameraWorker
 from gazefocus.calibration import commit_calibration
-from gazefocus.config import Config, ConfigWatcher, load_config, write_default_config
+from gazefocus.config import Config, ConfigWatcher, DockCfg, load_config, write_default_config
+from gazefocus.dock.view import view_for
 from gazefocus.logic.classifier import ZoneClassifier
 from gazefocus.logic.decider import GazeDecider
 from gazefocus.paths import app_dir
@@ -38,6 +39,8 @@ CAMERA_RETRY_S = 5.0
 CRASH_RESTART_S = 2.0
 HEALTHY_RESET_S = 60.0
 DISPLAY_SETTLE_MS = 1500
+FACE_LOST_S = 0.5  # the dock shows "no face" only after this long without one (no flicker)
+PREVIEW_FPS = 10.0  # the open panel's camera preview (spec §8.4)
 EXIT_ALREADY_RUNNING, EXIT_NO_MODEL = 4, 5
 
 
@@ -45,6 +48,28 @@ def instance_name() -> str:
     """One GazeFocus per user session; tests (GAZEFOCUS_HOME set) get their own mutex."""
     home = os.environ.get("GAZEFOCUS_HOME")
     return "Local\\GazeFocus" + (f"-{hashlib.sha1(home.encode()).hexdigest()[:8]}" if home else "")
+
+
+def qt_work_area(monitor: MonitorInfo) -> tuple[int, int, int, int] | None:
+    """A monitor's work area in Qt's logical coordinates.
+
+    Qt names screens by their friendly names ("LG FHD"), not their device names, but keeps each
+    screen's top-left at its native position (only sizes are scaled), so screens match by origin.
+    """
+    from PySide6.QtGui import QGuiApplication
+
+    for screen in QGuiApplication.screens():
+        g = screen.geometry()
+        if (g.left(), g.top()) == tuple(monitor.rect[:2]):
+            a = screen.availableGeometry()
+            return a.left(), a.top(), a.right() + 1, a.bottom() + 1
+    return None
+
+
+def make_dock(cfg: DockCfg, **callbacks):
+    from gazefocus.dock.window import DockWindow
+
+    return DockWindow(cfg, **callbacks)
 
 
 def real_desktop(work_area: Callable[[str], "tuple[int, int, int, int] | None"]) -> Desktop:
@@ -79,6 +104,9 @@ class GazeFocusApp:
         monitors: Callable[[], list[MonitorInfo]] = enumerate_monitors,
         calibration_seconds: float = 6.0,
         calibration_lead_in_s: float = 2.0,
+        dock_factory: Callable[..., object] | None = make_dock,
+        screen_work: Callable[[MonitorInfo], "tuple[int, int, int, int] | None"] = qt_work_area,
+        fullscreen_on: Callable[[str, tuple[int, int, int, int]], bool] = windows.fullscreen_app_on,
     ) -> None:
         self.cfg, self.qapp, self.log, self.beep = cfg, qapp, log, beep
         self.open_camera, self.make_tracker = open_camera, make_tracker
@@ -95,6 +123,11 @@ class GazeFocusApp:
         self._restart_at: float | None = None
         self._running_since: float | None = None
         self._notified: set[str] = set()
+        self._dock_factory, self._screen_work, self._fullscreen_on = dock_factory, screen_work, fullscreen_on
+        self.dock = None
+        self._dock_monitor: MonitorInfo | None = None
+        self._last_sample: HeadSample | None = None
+        self._face_t: float | None = None  # when a face was last seen (None: not since the camera started)
 
         self.window = MessageWindow("GazeFocus")
         self.input = InputTracker()
@@ -122,8 +155,9 @@ class GazeFocusApp:
         self.worker = CameraWorker(
             open_camera, make_tracker,
             on_sample=self._on_sample, on_failed=self._on_camera_failed, on_crashed=self._on_crashed,
-            fps=cfg.camera.fps,
+            on_preview=self._on_preview, fps=cfg.camera.fps,
         )
+        self._make_dock()
         self.config_watcher = ConfigWatcher(app_dir() / "config.toml", self._on_config)
         self.refresh_layout()
         self.apply()
@@ -132,6 +166,7 @@ class GazeFocusApp:
     def refresh_layout(self) -> None:
         self.monitors = self._monitors_fn()
         self._work_areas = {m.device: m.work for m in self.monitors}
+        self._place_dock()
         self.controller = None
         if len(self.monitors) != 2:
             self.state.calibration = "unsupported"
@@ -169,14 +204,21 @@ class GazeFocusApp:
         if wanted and not self.worker.running:
             if self.worker.start():  # refused while a stopped run still holds the camera; tick retries
                 self._running_since = time.perf_counter()
+                self._face_t = None  # a fresh start: don't show "no face" before the first frame
         elif not wanted and self.worker.running:
             self.worker.stop()
             self._running_since = None
         self._update_tray()
+        self._dock_visibility()
+        self._update_dock()
 
     def _on_sample(self, sample: HeadSample) -> None:
+        self._last_sample = sample
+        if sample.face:
+            self._face_t = sample.t
         if self.state.switching and self.controller is not None:
             self.controller.on_sample(sample)
+        self._update_dock()
 
     def _on_camera_failed(self, why: str) -> None:
         from gazefocus.win.camera_usage import camera_busy_message
@@ -211,6 +253,60 @@ class GazeFocusApp:
     def _on_foreground(self, hwnd: int) -> None:
         facts = windows.window_facts(hwnd)
         self.mru.on_foreground(time.perf_counter(), hwnd, facts.device, is_target=windows.is_switch_target(facts)[0])
+        self._dock_visibility()  # a fullscreen app may just have come to the front
+        self._update_dock()
+
+    # ---- the dock ------------------------------------------------------------------------------------
+    def _make_dock(self) -> None:
+        if self.dock is not None:
+            self.dock.close()
+            self.dock = None
+        if self.cfg.dock.enabled and self._dock_factory is not None:
+            self.dock = self._dock_factory(
+                self.cfg.dock, on_toggle_pause=self.toggle_pause, on_recalibrate=self.recalibrate,
+                on_panel=self._on_panel, freeze_s=self.cfg.decider.typing_freeze_ms / 1000.0,
+            )
+
+    def _place_dock(self) -> None:
+        want = self.cfg.dock.monitor  # the same choice as the LAPTOP zone (zone_monitors)
+        self._dock_monitor = next(
+            (m for m in self.monitors if (m.primary if want == "primary" else m.device == want)), None)
+        if self.dock is not None and self._dock_monitor is not None:
+            work = self._screen_work(self._dock_monitor)
+            if work is not None:
+                self.dock.place(work)
+
+    def _dock_visibility(self) -> None:
+        """Out of the way while locked, asleep, or under a fullscreen app on its monitor (1 Hz + on focus change)."""
+        if self.dock is None:
+            return
+        m = self._dock_monitor
+        self.dock.set_hidden(self.state.locked or self.state.suspended or m is None
+                             or self._fullscreen_on(m.device, m.rect))
+
+    def _update_dock(self) -> None:
+        """What the dock shows: cheap, called for every camera sample (the dock ignores repeats)."""
+        if self.dock is None:
+            return
+        now = time.perf_counter()
+        view = view_for(
+            self.state.status,
+            focus=self.controller.focus_zone() if self.controller is not None else Zone.UNKNOWN,
+            face=self._face_t is None or now - self._face_t < FACE_LOST_S,
+            last_key_t=self.input.last_key_t,
+            decision=self.controller.last_decision if self.controller is not None else None,
+            sample=self._last_sample,
+            now=now,
+            freeze_s=self.cfg.decider.typing_freeze_ms / 1000.0,
+        )
+        self.dock.set_view(view)
+
+    def _on_panel(self, is_open: bool) -> None:
+        self.worker.preview_fps = PREVIEW_FPS if is_open else 0.0  # the camera preview only while open
+
+    def _on_preview(self, frame, sample: HeadSample) -> None:
+        if self.dock is not None:
+            self.dock.set_preview(frame, sample)
 
     def _on_display_change(self) -> None:
         from PySide6.QtCore import QTimer
@@ -279,7 +375,10 @@ class GazeFocusApp:
         for w in warnings:
             self.log.warning("config: %s", w)
         hotkey_changed = cfg.hotkey.pause != self.cfg.hotkey.pause
+        dock_changed = cfg.dock != self.cfg.dock
         self.cfg = cfg
+        if dock_changed:
+            self._make_dock()  # placed by refresh_layout below
         self.worker.fps = cfg.camera.fps
         if hotkey_changed:
             if self.hotkey is not None:
@@ -333,7 +432,8 @@ class GazeFocusApp:
         if self._job is not None:
             self._job.cancel()
         self.worker.stop(timeout=3.0)
-        for part in (self.fg_hook, self.input_watcher, self.system_events, self.hotkey, self.tray, self.window):
+        for part in (self.dock, self.fg_hook, self.input_watcher, self.system_events, self.hotkey, self.tray,
+                     self.window):
             if part is not None:
                 part.close()
 

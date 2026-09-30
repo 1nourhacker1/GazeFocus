@@ -185,6 +185,12 @@ def cmd_run(args) -> int:
     return run_app(seconds=args.seconds)
 
 
+def cmd_dock_demo(args) -> int:
+    from gazefocus.dock.demo import run_demo
+
+    return run_demo(seconds=args.seconds)
+
+
 def _diag_zone_devices() -> tuple[dict, str]:
     """{zone: device} from a matching calibration, else primary = LAPTOP and the other = LG."""
     from gazefocus.storage import calibration_path, load_if_matches
@@ -266,6 +272,9 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="the GazeFocus background app (tray icon; focus follows your gaze)")
     run.add_argument("--seconds", type=float, help="quit after this many seconds (smoke tests)")
     run.set_defaults(fn=cmd_run)
+    dd = sub.add_parser("dock-demo", help="show the dock cycling through every state (no camera)")
+    dd.add_argument("--seconds", type=float, help="quit after this many seconds")
+    dd.set_defaults(fn=cmd_dock_demo)
     d = sub.add_parser("diag", help="check the Windows side: monitors, windows, a focus switch")
     dsub = d.add_subparsers(dest="what", required=True)
     dsub.add_parser("monitors", help="monitor layout, ids, fingerprint and zone mapping")

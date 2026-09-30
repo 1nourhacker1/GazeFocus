@@ -22,7 +22,7 @@ def test_help_lists_commands(capsys):
     # argparse prints the sub-commands as "{probe,live,...}"; match names exactly
     # (a bare substring check passed "run" via watch's "dry run" help text)
     commands = set(out[out.index("{") + 1 : out.index("}")].split(","))
-    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live", "run", "diag"):
+    for cmd in ("probe", "calibrate-cli", "watch", "bench", "replay", "live", "run", "diag", "dock-demo"):
         assert cmd in commands
 
 
