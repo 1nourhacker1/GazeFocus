@@ -1,5 +1,5 @@
 # gazefocus/dock/window.py
-Verified against: GazeFocus@948ff3a · 2026-09-30
+Verified against: GazeFocus@cf659ad · 2026-09-30
 
 `DockWindow`: the Liquid Glass pill under the laptop camera, with the hover panel (spec §8) and the calibration's intro and result panels (spec §9).
 - **Never focused:**
@@ -19,7 +19,8 @@ Verified against: GazeFocus@948ff3a · 2026-09-30
   - Closing drops the last preview frame; `set_preview` is refused while the panel is closed.
 - **Clicks:**
   - The collapsed pill: a ripple plus `on_pill` (the app calibrates on "!", else pauses; it defaults to `on_toggle_pause`).
-  - The open panel: only Pause/Resume and Recalibrate act.
+  - The open panel: only Pause/Resume and Recalibrate act. What's on screen decides, not the target: a click while the panel closes is still a panel click (Plan 3 carry-over).
+  - **A double-click is one click:** `mouseDoubleClickEvent` does nothing (Qt's default re-sends the press), and a pill press within the system's double-click interval of the last one is ignored (Windows sends that second press before the double-click).
   - The shadow never acts.
 - **Calibration panels** (modal):
   - `show_intro(on_start, on_cancel)` and `show_result(result, on_save, on_redo)` open the pill to that panel (`geometry.PANELS`). If the hover panel is open, the pill morphs from its size in 0.52 s, and its camera preview stops (`on_panel(False)`).
@@ -27,6 +28,7 @@ Verified against: GazeFocus@948ff3a · 2026-09-30
   - `close_modal()` closes the pill; the next hover opens the hover panel again.
   - `panel_open` means the hover panel only; `on_panel` reports only its changes.
 - `pill_centre()`: the collapsed pill's centre on the desktop, where the calibration drop leaves from. `raise_to_top()`: `capture.keep_on_top`, back above the calibration overlay (native only).
-- `set_hidden`: hide without closing (locked, asleep, or under a fullscreen app). No grabs, no frames.
+- `set_hidden`: hide without closing (locked, asleep, or under a fullscreen app). No grabs, no frames. An open hover panel closes first, which stops its preview. Showing again forgets the last backdrop, so the first grab draws whatever changed while hidden, and the clock is kicked.
 - `set_freeze(seconds)`: a live `typing_freeze_ms` change, so the lid's melt still ends with the freeze.
 - `place(work)`: the top centre of a work area in Qt logical coordinates (see `app/main.py:qt_work_area`).
+- `close()`: stops every timer, reports the hover panel closed (`on_panel(False)`), and releases the ticker and the grabber.
