@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@cb0c306 · 2026-09-29
+Verified against: GazeFocus@c85c304 · 2026-09-30
 
 `run_app()`:
 1. DPI awareness.
@@ -40,3 +40,11 @@ Verified against: GazeFocus@cb0c306 · 2026-09-29
 - resets the failure count after 60 s healthy
 
 **Camera for calls:** manual only, by pausing (the user's decision, 2026-09-29).
+
+**The dock (Plan 3):**
+- `make_dock` builds a `DockWindow`, unless `dock.enabled` is false.
+- `qt_work_area` finds the Qt screen by origin: Qt names screens "LG FHD", not `\\.\DISPLAY5`.
+- `_update_dock` runs for every sample, on `apply()` and on foreground changes. "No face" shows after 0.5 s.
+- `_dock_visibility` runs on `apply()` (1 Hz) and on foreground changes: the dock hides while locked, asleep, or under a fullscreen app.
+- `_on_panel` sets the camera preview to 10 fps while the panel is open.
+- A change to any dock setting rebuilds the dock.

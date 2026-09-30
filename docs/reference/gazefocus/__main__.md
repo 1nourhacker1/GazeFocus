@@ -1,5 +1,5 @@
 # gazefocus/__main__.py
-Verified against: GazeFocus@a0e7f5a · 2026-09-29
+Verified against: GazeFocus@c85c304 · 2026-09-30
 
 The console script is `gazefocus` (from `[project.scripts]`). Every command loads `config.toml` first, writing the defaults if it's missing, and prints any config warnings to stderr.
 
@@ -12,6 +12,7 @@ The console script is `gazefocus` (from `[project.scripts]`). Every command load
 | `bench [--minutes 10]` | camera | 0, 2 |
 | `replay FILE` | any calibration (no layout check) | 0, 1 (bad file), 3 |
 | `diag monitors \| windows [--all] \| focus {LAPTOP,LG} [--delay 3]` | nothing (focus: a window on that screen) | 0, 1 |
+| `dock-demo [--seconds N]` | nothing (shows the dock cycling through every state; no camera) | 0 |
 
 - Exit 2 prints `camera_busy_message`, which names the app that "possibly" holds the camera.
 - `calibrate-cli` **beeps** as each phase starts: 1 beep = look at the LG, 2 = the laptop, 3 = done.

@@ -70,3 +70,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/win/capture.py](reference/gazefocus/win/capture.md)
 - [gazefocus/dock/ticker.py](reference/gazefocus/dock/ticker.md)
 - [gazefocus/dock/window.py](reference/gazefocus/dock/window.md)
+- [gazefocus/dock/demo.py](reference/gazefocus/dock/demo.md)
