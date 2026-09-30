@@ -36,7 +36,7 @@ STALE_S = 1.0  # no sample for this long counts as no face (a camera that stoppe
 FADE_S = 0.25
 FRAME_60 = 1 / 60  # stretch is measured over one of the mockup's 60 Hz frames
 DIM_ON, DIM_OFF = 0.25, 0.62  # the screen to look at, the other one
-TOO_CLOSE = "Too close. Turn your head a little more, or move the LG closer to the laptop."
+TOO_CLOSE = "Turn your head a little more, or move the LG closer to the laptop."  # under the title "Too close"
 HINT = "Look at each screen: the water should follow."
 CARDS = {
     "lg_card": ("LG", "Look at this screen", "Follow the drop with your eyes"),

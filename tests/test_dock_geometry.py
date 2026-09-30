@@ -3,12 +3,14 @@ import pytest
 from gazefocus.dock.geometry import (
     MARGIN,
     PANEL,
+    PANELS,
     TOP_GAP,
     VIEWBOX,
     glyph_origin,
     pill_at,
     pill_size,
     placement,
+    mix,
     to_viewbox,
     window_size,
 )
@@ -21,9 +23,35 @@ def test_the_collapsed_pill_is_115_by_52():
     assert pill_size(SCALE) == pytest.approx((115.5, 52.5))
 
 
-def test_the_window_fits_the_panel_and_its_shadow():
+def test_the_window_fits_the_largest_panel_and_its_shadow():
     w, h = window_size(SCALE)
-    assert w == PANEL[0] + 2 * MARGIN and h == TOP_GAP + PANEL[1] + MARGIN
+    assert w == 372 + 2 * MARGIN and h == TOP_GAP + 200 + MARGIN  # the calibration result
+
+
+def test_each_panel_has_its_size():
+    assert (PANELS["status"].w, PANELS["status"].h, PANELS["status"].r) == (*PANEL, 26.0)
+    assert (PANELS["intro"].w, PANELS["intro"].h, PANELS["intro"].r) == (300.0, 150.0, 24.0)
+    assert (PANELS["result"].w, PANELS["result"].h, PANELS["result"].r) == (372.0, 200.0, 26.0)
+
+
+def test_the_pill_opens_to_the_panel_it_is_given():
+    w, _ = window_size(SCALE)
+    p = pill_at(1.0, SCALE, w, PANELS["result"])
+    assert (p.hw * 2, p.hh * 2, p.r) == pytest.approx((372.0, 200.0, 26.0))
+    assert p.cx == pytest.approx(w / 2) and p.top == pytest.approx(TOP_GAP)
+
+
+def test_panels_morph_into_each_other():
+    m = mix(PANELS["status"], PANELS["result"], 0.5)
+    assert (m.w, m.h, m.glyph_w) == pytest.approx((336.0, 179.0, (77 + 36) / 2))
+    assert mix(PANELS["status"], PANELS["intro"], 1.0) == PANELS["intro"]
+
+
+def test_the_glyph_is_small_on_the_calibration_panels():
+    w, _ = window_size(SCALE)
+    opened = pill_at(1.0, SCALE, w, PANELS["intro"])
+    x, y, k = glyph_origin(1.0, SCALE, opened, PANELS["intro"])
+    assert VIEWBOX[0] * k == pytest.approx(36.0) and y == pytest.approx(opened.top)
 
 
 def test_placement_is_top_centre_of_the_work_area():
@@ -48,8 +76,9 @@ def test_pill_morphs_from_collapsed_to_panel():
 def test_the_spring_overshoot_still_fits_in_the_window():
     w, h = window_size(SCALE)
     peak = max(EXPAND(i / 200) for i in range(201))
-    p = pill_at(peak, SCALE, w)
-    assert p.left > 0 and p.cx + p.hw < w and p.cy + p.hh < h
+    for panel in PANELS.values():
+        p = pill_at(peak, SCALE, w, panel)
+        assert p.left > 0 and p.cx + p.hw < w and p.cy + p.hh < h
 
 
 def test_contains_follows_the_rounded_shape():

@@ -167,7 +167,7 @@ def test_screens_that_look_alike_are_too_close_to_save():
     r = s.result()
     assert not r.can_save and r.quality in ("too close", None)
     assert r.title == "Too close"
-    assert r.message == "Too close. Turn your head a little more, or move the LG closer to the laptop."
+    assert f"{r.title}. {r.message}" == "Too close. Turn your head a little more, or move the LG closer to the laptop."
 
 
 def test_a_normal_run_fits_a_model_that_can_be_saved():

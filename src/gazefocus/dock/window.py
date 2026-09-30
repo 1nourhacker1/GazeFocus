@@ -1,4 +1,5 @@
-"""The dock window (spec §8): a Liquid Glass pill under the laptop camera, with the hover panel.
+"""The dock window (spec §8): a Liquid Glass pill under the laptop camera, with the hover panel,
+and the calibration's intro and result panels (spec §9), which stay open until a button is pressed.
 
 It never takes focus, lets clicks through where it is transparent, and draws only when something
 changes (spec §8.3: no idle animation). The frame pipeline (M0-C2):
@@ -24,7 +25,8 @@ from PySide6.QtWidgets import QWidget
 from gazefocus.config import DockCfg
 from gazefocus.dock import geometry, glass
 from gazefocus.dock.glyph import draw_glyph
-from gazefocus.dock.motion import EXPAND, Channel, ease_out
+from gazefocus.dock.modal import draw_intro, draw_result, modal_button_at
+from gazefocus.dock.motion import EXPAND, Channel, ease_in_out, ease_out
 from gazefocus.dock.panel import PanelContent, button_at, draw_panel, preview_image
 from gazefocus.dock.scene import GlyphScene
 from gazefocus.dock.ticker import VBlankTicker
@@ -63,6 +65,13 @@ class DockWindow(QWidget):
         self.on_toggle_pause, self.on_recalibrate, self.on_panel = on_toggle_pause, on_recalibrate, on_panel
         self.scene = GlyphScene(freeze_s=freeze_s, seed=seed)
         self.openness = Channel(0.0)
+        self.modal: str | None = None  # "intro" or "result" while a calibration panel is up
+        self.result = None  # the CalibrationResult the result panel shows
+        self._actions: dict[str, Callable[[], None]] = {}
+        self._kind = "status"  # the panel the pill opens to (and whose content it draws)
+        self._panel_from = self._panel_to = geometry.PANELS["status"]
+        self._morph = Channel(1.0)
+        self._reported = False  # what on_panel last said about the hover panel
         self.view = DockView(IDLE, Zone.LAPTOP)
         self.scene.update(self.view, clock())
         self.preview: QImage | None = None
@@ -118,7 +127,54 @@ class DockWindow(QWidget):
 
     @property
     def panel_open(self) -> bool:
-        return self.openness.target > 0.5
+        """The hover panel (with its camera preview) is open or opening."""
+        return self.modal is None and self.openness.target > 0.5
+
+    def show_intro(self, on_start: Callable[[], None], on_cancel: Callable[[], None]) -> None:
+        self._show_modal("intro", {"start": on_start, "cancel": on_cancel})
+
+    def show_result(self, result, on_save: Callable[[], None], on_redo: Callable[[], None]) -> None:
+        self.result = result
+        self._show_modal("result", {"save": on_save, "redo": on_redo})
+
+    def close_modal(self) -> None:
+        if self.modal is None:
+            return
+        self.modal, self._actions = None, {}
+        self.openness.to(0.0, self.clock(), CLOSE_S, ease_out)
+        self._kick()
+
+    def panel_size(self, now: float) -> geometry.PanelSize:
+        return geometry.mix(self._panel_from, self._panel_to, self._morph.get(now))
+
+    def _show_modal(self, kind: str, actions: dict[str, Callable[[], None]]) -> None:
+        now = self.clock()
+        self.modal, self._actions = kind, actions
+        self._hover.stop()
+        self._leave.stop()
+        self.preview = self.preview_sample = None
+        self._report(False)
+        self._set_panel(kind, now)
+        if self.openness.target < 0.5:
+            self.openness.to(1.0, now, OPEN_S, EXPAND)
+        self._kick()
+
+    def _set_panel(self, kind: str, now: float) -> None:
+        self._kind, target = kind, geometry.PANELS[kind]
+        if target == self._panel_to:
+            return
+        if self.openness.get(now) < 0.01:  # closed: nothing to morph
+            self._panel_from = self._panel_to = target
+            self._morph.set(1.0)
+            return
+        self._panel_from, self._panel_to = self.panel_size(now), target
+        self._morph.set(0.0)
+        self._morph.to(1.0, now, OPEN_S, ease_in_out)
+
+    def _report(self, is_open: bool) -> None:
+        if is_open != self._reported:
+            self._reported = is_open
+            self.on_panel(is_open)
 
     def set_hidden(self, hidden: bool) -> None:
         """Out of the way (screen locked, a fullscreen app on this monitor), without closing."""
@@ -213,25 +269,32 @@ class DockWindow(QWidget):
         if self._out is None or self._out.shape[:2] != (h, w):
             return  # resized since the last grab: the next grab catches up
         t = self.openness.get(now)
-        step = 2 if self.openness.busy(now) else 1
-        key = (round(t, 4), self.dark, step)
+        panel = self.panel_size(now)
+        step = 2 if self.openness.busy(now) or self._morph.busy(now) else 1
+        key = (round(t, 4), self.dark, step, round(panel.w, 2), round(panel.h, 2))
         if key != self._glass_key:
-            pill_px = geometry.pill_at(t, self.cfg.scale, w / dpr).scaled(dpr)
+            pill_px = geometry.pill_at(t, self.cfg.scale, w / dpr, panel).scaled(dpr)
             glass.render(self._backdrop, pill_px, dpr=dpr, dark=self.dark, openness=t,
                          refraction=self.cfg.refraction, step=step, grid=self._grid, out=self._out)
             img = QImage(self._out.data, w, h, 4 * w, QImage.Format_ARGB32_Premultiplied).copy()
             img.setDevicePixelRatio(dpr)
             self._glass_key, self._glass_img = key, img
         img = self._glass_img.copy()
-        pill = geometry.pill_at(t, self.cfg.scale, w / dpr)
+        pill = geometry.pill_at(t, self.cfg.scale, w / dpr, panel)
         p = QPainter(img)
-        draw_glyph(p, self.scene.frame(now), geometry.glyph_origin(t, self.cfg.scale, pill), dark=self.dark, dpr=dpr)
+        draw_glyph(p, self.scene.frame(now), geometry.glyph_origin(t, self.cfg.scale, pill, panel),
+                   dark=self.dark, dpr=dpr)
         if t > 0.45:
             clip = QPainterPath()
             clip.addRoundedRect(QRectF(pill.left, pill.top, 2 * pill.hw, 2 * pill.hh), pill.r, pill.r)
             p.setClipPath(clip)  # the content is revealed as the pill grows
-            draw_panel(p, pill.cx - geometry.PANEL[0] / 2, pill.top, self._content(),
-                       opacity=min(1.0, (t - 0.45) / 0.4), dark=self.dark)
+            left, opacity = pill.cx - panel.w / 2, min(1.0, (t - 0.45) / 0.4)
+            if self._kind == "intro":
+                draw_intro(p, left, pill.top, opacity=opacity, dark=self.dark)
+            elif self._kind == "result" and self.result is not None:
+                draw_result(p, left, pill.top, self.result, opacity=opacity, dark=self.dark)
+            else:
+                draw_panel(p, left, pill.top, self._content(), opacity=opacity, dark=self.dark)
         p.end()
         self.img, self.frames, self._last_frame_t = img, self.frames + 1, now
         self.repaint()  # now, inside this tick, rather than at the next event-loop pass
@@ -245,7 +308,7 @@ class DockWindow(QWidget):
 
     # ---- the clock -----------------------------------------------------------------------------------------
     def _moving(self, now: float) -> tuple[bool, bool]:
-        fast = self.scene.fast(now) or self.openness.busy(now)
+        fast = self.scene.fast(now) or self.openness.busy(now) or self._morph.busy(now)
         return fast, fast or self.scene.busy(now)
 
     def _kick(self) -> None:
@@ -279,18 +342,26 @@ class DockWindow(QWidget):
 
     # ---- hover and clicks ---------------------------------------------------------------------------------
     def _open(self) -> None:
-        self.openness.to(1.0, self.clock(), OPEN_S, EXPAND)
-        self.on_panel(True)
+        if self.modal is not None:
+            return
+        now = self.clock()
+        self._set_panel("status", now)
+        self.openness.to(1.0, now, OPEN_S, EXPAND)
+        self._report(True)
         self._kick()
 
     def _close(self) -> None:
+        if self.modal is not None:
+            return  # a calibration panel waits for its buttons
         self.openness.to(0.0, self.clock(), CLOSE_S, ease_out)
         self.preview = self.preview_sample = None  # frames are never kept once the panel is closed
-        self.on_panel(False)
+        self._report(False)
         self._kick()
 
     def _pointer(self, x: float, y: float) -> None:
         """Hover and leave follow the pill itself: the shadow around it doesn't count."""
+        if self.modal is not None:
+            return
         inside = geometry.pill_at(self.openness.get(self.clock()), self.cfg.scale, self.width()).contains(x, y)
         if self.panel_open:
             if inside:
@@ -310,7 +381,7 @@ class DockWindow(QWidget):
 
     def leaveEvent(self, e) -> None:
         self._hover.stop()
-        if self.panel_open:
+        if self.panel_open:  # never a calibration panel
             self._leave.start()
 
     def mousePressEvent(self, e) -> None:
@@ -318,9 +389,15 @@ class DockWindow(QWidget):
             return
         x, y, now = e.position().x(), e.position().y(), self.clock()
         t = self.openness.get(now)
-        pill = geometry.pill_at(t, self.cfg.scale, self.width())
+        panel = self.panel_size(now)
+        pill = geometry.pill_at(t, self.cfg.scale, self.width(), panel)
         if not pill.contains(x, y):
             return  # the shadow is ours to draw, not to act on
+        if self.modal is not None:  # only the calibration panel's buttons act
+            action = self._actions.get(modal_button_at(self.modal, x, y, pill.cx - panel.w / 2, pill.top, self.result))
+            if action is not None:
+                action()
+            return
         if self.panel_open:
             button = button_at(x, y, pill.cx - geometry.PANEL[0] / 2, pill.top)
             if button == "pause":

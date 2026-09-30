@@ -260,3 +260,96 @@ def test_leaving_the_open_panel_onto_its_shadow_starts_closing(dock):
     assert d._leave.isActive()
     move(d, pill.cx, pill.cy)
     assert not d._leave.isActive()
+
+
+def ok_result():
+    import random
+
+    from gazefocus.calib.session import CalibrationResult
+    from gazefocus.logic.classifier import fit_zone_model
+
+    rng = random.Random(2)
+    lg = [HeadSample(i, True, 30 + rng.gauss(0, 2), rng.gauss(0, 2), 0.0) for i in range(50)]
+    lap = [HeadSample(i, True, rng.gauss(0, 2), rng.gauss(0, 2), 0.0) for i in range(50)]
+    return CalibrationResult(fit_zone_model(lg, lap), {"LG": lg, "LAPTOP": lap}, {"LG": 50, "LAPTOP": 50},
+                             "excellent", "Calibrated ✓", "Look at each screen: the water should follow.")
+
+
+def click_modal(d, clock, name, kind="intro", result=None):
+    from gazefocus.dock.modal import INTRO_BUTTONS, result_buttons
+
+    pill = geometry.pill_at(d.openness.get(clock.t), CFG.scale, d.width(), geometry.PANELS[kind])
+    left = pill.cx - geometry.PANELS[kind].w / 2
+    rects = INTRO_BUTTONS if kind == "intro" else result_buttons(True)
+    c = rects[name].center()
+    QTest.mouseClick(d, Qt.LeftButton, Qt.NoModifier, QPoint(int(left + c.x()), int(pill.top + c.y())))
+
+
+def test_the_intro_is_modal_and_leaving_it_does_not_close_it(dock):
+    d, clock, ticker, calls = dock
+    d.show_intro(lambda: calls.append("start"), lambda: calls.append("cancel"))
+    run_ticks(d, clock, ticker, 1.0)
+    assert d.modal == "intro" and d.openness.get(clock.t) == pytest.approx(1.0)
+    pill = geometry.pill_at(1.0, CFG.scale, d.width(), geometry.PANELS["intro"])
+    assert (pill.hw * 2, pill.hh * 2) == pytest.approx((300.0, 150.0))
+    move(d, pill.cx, pill.cy + pill.hh + 6)  # onto the shadow
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QApplication
+
+    QApplication.sendEvent(d, QEvent(QEvent.Leave))
+    assert not d._leave.isActive() and d.openness.target == 1.0
+    assert ("panel", True) not in calls  # no camera preview for the calibration's panels
+
+
+def test_the_intro_buttons_start_and_cancel(dock):
+    d, clock, ticker, calls = dock
+    for name in ("start", "cancel"):
+        d.show_intro(lambda: calls.append("start"), lambda: calls.append("cancel"))
+        run_ticks(d, clock, ticker, 1.0)
+        click_modal(d, clock, name)
+        assert calls[-1] == name
+
+
+def test_clicks_outside_the_modal_buttons_do_nothing(dock):
+    d, clock, ticker, calls = dock
+    d.show_intro(lambda: calls.append("start"), lambda: calls.append("cancel"))
+    run_ticks(d, clock, ticker, 1.0)
+    pill = geometry.pill_at(1.0, CFG.scale, d.width(), geometry.PANELS["intro"])
+    QTest.mouseClick(d, Qt.LeftButton, Qt.NoModifier, QPoint(int(pill.cx), int(pill.cy - 20)))  # the paragraph
+    assert calls == []  # not even a pause
+
+
+def test_the_result_panel_saves_or_redoes(dock):
+    d, clock, ticker, calls = dock
+    d.show_result(ok_result(), lambda: calls.append("save"), lambda: calls.append("redo"))
+    run_ticks(d, clock, ticker, 1.0)
+    pill = geometry.pill_at(1.0, CFG.scale, d.width(), geometry.PANELS["result"])
+    assert (pill.hw * 2, pill.hh * 2) == pytest.approx((372.0, 200.0))
+    click_modal(d, clock, "save", "result")
+    click_modal(d, clock, "redo", "result")
+    assert calls == ["save", "redo"]
+
+
+def test_close_modal_closes_and_the_hover_panel_works_again(dock):
+    d, clock, ticker, calls = dock
+    d.show_intro(lambda: None, lambda: None)
+    run_ticks(d, clock, ticker, 1.0)
+    d.close_modal()
+    run_ticks(d, clock, ticker, 1.0)
+    assert d.modal is None and d.openness.get(clock.t) == pytest.approx(0.0)
+    d._hover.timeout.emit()
+    run_ticks(d, clock, ticker, 1.0)
+    assert d.panel_open and ("panel", True) in calls
+    pill = geometry.pill_at(1.0, CFG.scale, d.width())
+    assert (pill.hw * 2, pill.hh * 2) == pytest.approx(geometry.PANEL)
+
+
+def test_the_intro_replacing_the_hover_panel_stops_the_preview(dock):
+    d, clock, ticker, calls = dock
+    d._hover.timeout.emit()
+    run_ticks(d, clock, ticker, 1.0)
+    d.set_preview(np.zeros((120, 160, 3), np.uint8), HeadSample(clock.t, True))
+    d.show_intro(lambda: None, lambda: None)
+    assert calls[-1] == ("panel", False) and d.preview is None
+    run_ticks(d, clock, ticker, 1.0)
+    assert d.panel_size(clock.t) == geometry.PANELS["intro"]  # morphed from the hover panel's size

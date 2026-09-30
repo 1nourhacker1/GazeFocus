@@ -1,7 +1,8 @@
-"""Dock sizes and placement (spec §8.1, §8.4). Logical px (Qt's units) unless a name ends in `_px`. Pure.
+"""Dock sizes and placement (spec §8.1, §8.4, §9). Logical px (Qt's units) unless a name ends in `_px`. Pure.
 
-The window is sized once for the open panel and never moves; the pill is drawn inside it and
-morphs between the collapsed size and the panel (`openness` 0..1, overshooting with the spring).
+The window is sized once for the largest panel and never moves; the pill is drawn inside it and
+morphs between the collapsed size and a panel (`openness` 0..1, overshooting with the spring).
+There are three panels: the hover panel ("status") and the calibration's intro and result.
 """
 
 from __future__ import annotations
@@ -10,12 +11,35 @@ import math
 from dataclasses import dataclass
 
 BASE = (44.0, 20.0)  # the collapsed pill at scale 1
-PANEL = (300.0, 158.0)
-PANEL_RADIUS = 26.0
 TOP_GAP = 4.0  # under the top edge of the work area
 MARGIN = 16.0  # around the panel, for the shadow
 VIEWBOX = (88.0, 40.0)  # the glyph's coordinate system (the mockup's SVG)
-PANEL_GLYPH_W = 77.0  # the glyph's width inside the open panel (the mockup's scale 1.75)
+
+
+@dataclass(frozen=True)
+class PanelSize:
+    w: float
+    h: float
+    r: float  # corner radius
+    glyph_w: float  # the glyph's width at the top of the open panel
+    content_top: float  # where the content starts, below the glyph
+
+
+PANELS = {
+    "status": PanelSize(300.0, 158.0, 26.0, 77.0, 41.0),  # the glyph at the mockup's scale 1.75
+    "intro": PanelSize(300.0, 150.0, 24.0, 36.0, 24.0),  # mockup 03: a small glyph, the content from 24 px
+    "result": PanelSize(372.0, 200.0, 26.0, 36.0, 24.0),
+}
+PANEL = (PANELS["status"].w, PANELS["status"].h)
+PANEL_RADIUS = PANELS["status"].r
+PANEL_GLYPH_W = PANELS["status"].glyph_w
+
+
+def mix(a: PanelSize, b: PanelSize, t: float) -> PanelSize:
+    """A panel part-way between two others (the pill morphing from the hover panel to the intro)."""
+    if t >= 1:
+        return b
+    return PanelSize(*(lerp(x, y, t) for x, y in zip(vars(a).values(), vars(b).values())))
 
 
 @dataclass(frozen=True)
@@ -56,7 +80,8 @@ def pill_size(scale: float) -> tuple[float, float]:
 
 def window_size(scale: float) -> tuple[float, float]:
     w, h = pill_size(scale)
-    return max(PANEL[0], w) + 2 * MARGIN, TOP_GAP + max(PANEL[1], h) + MARGIN
+    pw, ph = max(p.w for p in PANELS.values()), max(p.h for p in PANELS.values())
+    return max(pw, w) + 2 * MARGIN, TOP_GAP + max(ph, h) + MARGIN
 
 
 def placement(work: tuple[int, int, int, int], scale: float) -> tuple[int, int, int, int]:
@@ -66,21 +91,22 @@ def placement(work: tuple[int, int, int, int], scale: float) -> tuple[int, int, 
     return round((left + right) / 2 - w / 2), top, math.ceil(w), math.ceil(h)
 
 
-def pill_at(openness: float, scale: float, window_w: float) -> Pill:
+def pill_at(openness: float, scale: float, window_w: float, panel: PanelSize = PANELS["status"]) -> Pill:
     pw, ph = pill_size(scale)
-    w, h = lerp(pw, PANEL[0], openness), lerp(ph, PANEL[1], openness)
-    r = min(lerp(ph / 2, PANEL_RADIUS, max(0.0, min(1.0, openness))), h / 2)
+    w, h = lerp(pw, panel.w, openness), lerp(ph, panel.h, openness)
+    r = min(lerp(ph / 2, panel.r, max(0.0, min(1.0, openness))), h / 2)
     return Pill(window_w / 2, TOP_GAP + h / 2, w / 2, h / 2, r)
 
 
-def glyph_origin(openness: float, scale: float, pill: Pill) -> tuple[float, float, float]:
+def glyph_origin(openness: float, scale: float, pill: Pill,
+                 panel: PanelSize = PANELS["status"]) -> tuple[float, float, float]:
     """(x0, y0, k): where the viewBox's (0, 0) sits and how many logical px one unit is.
 
     Collapsed, the glyph fills the pill; open, it stays centred at the top and shrinks to the
     mockup's size, with the panel's content below it (as in the approved mockup).
     """
     t = max(0.0, min(1.0, openness))
-    k = lerp(pill_size(scale)[0] / VIEWBOX[0], PANEL_GLYPH_W / VIEWBOX[0], t)
+    k = lerp(pill_size(scale)[0] / VIEWBOX[0], panel.glyph_w / VIEWBOX[0], t)
     return pill.cx - VIEWBOX[0] * k / 2, pill.top, k
 
 
