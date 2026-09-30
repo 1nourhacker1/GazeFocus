@@ -23,6 +23,28 @@ FRAME = np.zeros((2, 2, 3), np.uint8)
 TEST_HOTKEY = "Ctrl+Alt+Shift+F24"  # tests never register the real Ctrl+Alt+G
 
 
+class NoInput:
+    """Stands in for InputWatcher: tests set `app.input` themselves and never hear the real keyboard or mouse."""
+
+    def __init__(self, window, tracker) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _no_real_input(monkeypatch):
+    monkeypatch.setattr("gazefocus.app.main.InputWatcher", NoInput)
+
+
+def test_the_rig_never_hears_the_real_keyboard(rig):
+    """The real InputWatcher registers system-wide Raw Input: typing during a test run would freeze switching."""
+    from gazefocus.win.rawinput import InputWatcher
+
+    assert not isinstance(rig[0].input_watcher, InputWatcher)
+
+
 class FakeCamera:
     backend = "FAKE"
 
