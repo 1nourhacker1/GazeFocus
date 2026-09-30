@@ -254,7 +254,7 @@ class Decision:
 | State | Visual |
 |---|---|
 | Tracking | Water in the focused tile, which is the bigger one |
-| Frozen while typing | Water turns **amber** (#D67800 / #FF9F0A) and a **lid** line closes over the tile. A blocked gaze makes the water wobble slightly. When typing stops, the lid **melts linearly over 1.5 s**, showing the freeze countdown. |
+| Frozen while typing | Water turns **amber** (#D67800 / #FF9F0A) and a **lid** line closes over the tile. A blocked gaze makes the water wobble slightly. The lid holds for 0.3 s after each key (steady typing never moves it), then melts linearly and is gone exactly when the 1.5 s freeze ends: the freeze countdown (Plan 3). |
 | No face | The water **evaporates** (5 steam particles) and the tiles are empty. Focus is held. |
 | Paused | The water **drains**, the tiles drop to 1.0 and dim, and **pause bars** appear |
 | Camera off / not calibrated / error | Empty tiles plus a small "!" |
@@ -279,6 +279,10 @@ class Decision:
   - yaw, pitch, margin, and time since the last key
   - **Pause/Resume** and **Recalibrate** buttons
 - **Clicking the pill area** toggles pause, with a ripple.
+- **The open panel (Plan 3):**
+  - The glyph stays centred at the top at 77 px wide, with the content 6 px below it (the mockup's layout).
+  - Only its buttons act; a click anywhere else in it, or on the shadow, does nothing.
+  - The camera preview runs at 10 fps only while the panel is open, and the last frame is dropped when it closes.
 
 ### 8.5 Implementation (M0-C2, 2026-09-30)
 - **Window:** a frameless, translucent `QWidget` with `Qt.Tool | FramelessWindowHint | WindowStaysOnTopHint | WindowDoesNotAcceptFocus` and `WA_ShowWithoutActivating`.
@@ -296,6 +300,7 @@ class Decision:
   - While the panel resizes, the glass renders at half resolution, then one full-resolution frame follows.
   - No grabs run while something moves.
 - **Expanding:** the window is sized to the panel's maximum, and the pill is drawn inside it.
+- **Hidden** while locked, asleep, or while a fullscreen app (not a maximized window) covers the laptop screen (Plan 3).
 - See `docs/spikes/m0c-glass-dock.md` and `docs/spikes/m0c2-liquid-glass.md`.
 - **CPU cost:**
   - When idle, there are zero frames. There's only a 4–6 ms screen grab about 7 times a second, to notice changes behind the dock.
@@ -477,3 +482,6 @@ The camera-only spikes (A, C, D) run with the LG disconnected. M0-B needs any se
 | Dock renderer (M0-C2) | CPU: self-captured backdrop, numpy/OpenCV glass, per-pixel alpha, DwmFlush clock | Qt Quick shader; WebView acrylic |
 | Dock size (M0-C2, user) | Pill 1.5× bigger (115.5×52.5); panel stays 300×158 | 77×35 |
 | Lens rim (M0-C2) | On by default, config switch | Off |
+| Typing lid timing (Plan 3) | Holds 0.3 s, then melts until the freeze ends | Melts over 1.5 s after typing stops |
+| Dock over fullscreen apps (Plan 3) | Hidden | Always on top |
+| Calibration overlay | Plan 4 | Plan 3 |
