@@ -1,5 +1,5 @@
 # gazefocus/dock/scene.py
-Verified against: GazeFocus@fd4a5d6 · 2026-09-30
+Verified against: GazeFocus@8db716d · 2026-09-30
 
 The glyph's state machine: the approved mockup's animations (spec §8.2, §8.3), time-based and pure, in the mockup's viewBox units (88 × 40).
 - Tiles: LG (18, 10, 22, 14) and laptop (48, 14, 22, 14). The focused tile is at 1.18, the other at 0.9, and both at 1.0 when not tracking.
@@ -16,7 +16,7 @@ The glyph's state machine: the approved mockup's animations (spec §8.2, §8.3),
 | `blocked` rises | a 0.9 wobble (it decays faster under a closed lid) |
 
 **The lid:**
-- `lid(now) = min(close, melt)`. `melt` stays 1 for `hold_s` (0.3 s) after the last key, then falls linearly to 0 exactly when the freeze ends.
+- `lid(now) = min(close, melt)`. `melt` stays 1 for the hold (0.3 s, but never longer than the freeze) after the last key, then falls linearly to 0 exactly when the freeze ends. A freeze of 0 shows no lid; no freeze value raises (final-review fix).
 - Amber = clamp(1.2·lid − 0.2).
 
 **Sampling:**
