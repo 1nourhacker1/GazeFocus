@@ -7,7 +7,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 
 | Area | Status | Verified against |
 |---|---|---|
-| `superpowers/specs/` | Design. §7.3 and §12 updated with the M0-B result (2026-09-30). §6, §7.4, §8.5, §10 and §15 were amended after Plan 1; §5, §7.1, §7.4, §12.3 and §15 again after Plan 2, and the header, §4.5, §9 and §15 after its final review (2026-09-29). §4 and §7 are implemented and unit-tested, but desk acceptance is pending; §8 and §9 (the dock and overlay) wait for Plan 3 | — |
+| `superpowers/specs/` | Design. §7.3 and §12 updated with the M0-B result (2026-09-30). §6, §7.4, §8.5, §10 and §15 were amended after Plan 1; §5, §7.1, §7.4, §12.3 and §15 again after Plan 2, and the header, §4.5, §9 and §15 after its final review (2026-09-29). §4 and §7 are implemented, unit-tested and accepted at the desk (2026-09-30); §8 and §9 (the dock and overlay) wait for Plan 3 | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
 | `reference/gazefocus/` | Code-verified per file (see each `Verified against`) | per file |
 | `spikes/` | Hardware spike results, pasted from real runs | per file |
@@ -46,7 +46,7 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/win/msgwindow.py](reference/gazefocus/win/msgwindow.md)
 - [gazefocus/win/windows.py](reference/gazefocus/win/windows.md)
 - [gazefocus/win/focus.py](reference/gazefocus/win/focus.md)
-- [M0-B: focus switch (pending)](spikes/m0b-focus-switch.md)
+- [M0-B: focus switch](spikes/m0b-focus-switch.md)
 - [gazefocus/win/rawinput.py](reference/gazefocus/win/rawinput.md)
 - [gazefocus/win/foreground.py](reference/gazefocus/win/foreground.md)
 - [gazefocus/win/system.py](reference/gazefocus/win/system.md)
@@ -58,4 +58,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/app/workers.py](reference/gazefocus/app/workers.md)
 - [gazefocus/app/tray.py](reference/gazefocus/app/tray.md)
 - [gazefocus/app/main.py](reference/gazefocus/app/main.md)
-- [Plan 2 acceptance (pending)](spikes/plan2-acceptance.md)
+- [Plan 2 acceptance](spikes/plan2-acceptance.md)

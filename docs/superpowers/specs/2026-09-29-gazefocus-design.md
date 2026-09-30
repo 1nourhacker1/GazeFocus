@@ -1,7 +1,7 @@
 # GazeFocus: design spec
 
 > Status: **design, approved section by section in brainstorming on 2026-09-29; the written spec was approved the same day.**
-> Implemented through Plan 2: §4, §6, §7 and §10–12 in `src/gazefocus/`, with the per-file docs under `docs/reference/gazefocus/`. Desk acceptance is pending. §8 and §9 (the dock and overlay) are Plan 3.
+> Implemented through Plan 2: §4, §6, §7 and §10–12 in `src/gazefocus/`, with the per-file docs under `docs/reference/gazefocus/`. Desk acceptance passed for the core scenarios (2026-09-30). §8 and §9 (the dock and overlay) are Plan 3.
 > Mockups: `docs/superpowers/mockups/` (the dock, calibration, and the earlier style options).
 
 ## 1. Intent

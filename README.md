@@ -2,7 +2,7 @@
 
 Webcam "focus follows gaze" for a two-monitor Windows desk. Look at a screen, and keyboard focus goes to the last window you used there. A Liquid Glass status dock sits under the laptop camera.
 
-**Status: Plan 2 of 3.** `gazefocus run` is the real app: focus follows your gaze. Plan 3 adds the Liquid Glass dock and the calibration overlay.
+**Status: Plan 2 of 3 (accepted at the desk 2026-09-30).** `gazefocus run` is the real app: focus follows your gaze. Plan 3 adds the Liquid Glass dock and the calibration overlay.
 
 ## Using it
 - Start it with `uv run gazefocus run`. A two-tile icon appears in the tray (possibly under the ^ overflow arrow).
