@@ -48,6 +48,7 @@ class DockWindow(QWidget):
         on_toggle_pause: Callable[[], None],
         on_recalibrate: Callable[[], None],
         on_panel: Callable[[bool], None] = lambda is_open: None,
+        on_pill: Callable[[], None] | None = None,
         freeze_s: float = 1.5,
         native: bool = True,
         grabber_factory: Callable[[int, int], object] | None = None,
@@ -63,6 +64,7 @@ class DockWindow(QWidget):
         self.cfg, self.clock = cfg, clock
         self.native = native and QGuiApplication.platformName() == "windows"  # never on the test platform
         self.on_toggle_pause, self.on_recalibrate, self.on_panel = on_toggle_pause, on_recalibrate, on_panel
+        self.on_pill = on_pill or on_toggle_pause  # a click on the collapsed pill (the app: pause, or calibrate on "!")
         self.scene = GlyphScene(freeze_s=freeze_s, seed=seed)
         self.openness = Channel(0.0)
         self.modal: str | None = None  # "intro" or "result" while a calibration panel is up
@@ -175,6 +177,19 @@ class DockWindow(QWidget):
         if is_open != self._reported:
             self._reported = is_open
             self.on_panel(is_open)
+
+    def pill_centre(self) -> tuple[float, float]:
+        """The collapsed pill's centre on the desktop (logical px): where the calibration drop leaves from."""
+        pill = geometry.pill_at(0.0, self.cfg.scale, self.width())
+        return self.x() + pill.cx, self.y() + pill.cy
+
+    def raise_to_top(self) -> bool:
+        """Back above topmost windows shown after the dock (the calibration overlay)."""
+        if not self.native:
+            return False
+        from gazefocus.win.capture import keep_on_top
+
+        return keep_on_top(int(self.winId()))
 
     def set_hidden(self, hidden: bool) -> None:
         """Out of the way (screen locked, a fullscreen app on this monitor), without closing."""
@@ -407,5 +422,5 @@ class DockWindow(QWidget):
             return
         u, v = geometry.to_viewbox(x, y, geometry.glyph_origin(t, self.cfg.scale, pill))
         self.scene.ripple(u, v, now)  # clicking the pill toggles pause, with a ripple (spec §8.4)
-        self.on_toggle_pause()
+        self.on_pill()
         self._kick()

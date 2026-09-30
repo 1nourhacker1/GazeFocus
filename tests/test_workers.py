@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from gazefocus.app.workers import CalibrationJob, CameraWorker
+from gazefocus.app.workers import CameraWorker
 from gazefocus.types import HeadSample
 
 FRAME = np.zeros((2, 2, 3), np.uint8)
@@ -130,48 +130,12 @@ def test_a_run_stopped_while_opening_reports_no_failure(qapp):
     assert not wait_until(qapp, lambda: failed, timeout=0.5)
 
 
-def test_cancel_stops_a_calibration_and_releases_the_camera(qapp):
-    cams, cues, outcomes = [], [], []
-
-    def open_camera():
-        cams.append(FakeCamera())
-        return cams[-1]
-
-    job = CalibrationJob(open_camera, FakeTracker, cue=cues.append, on_done=outcomes.append,
-                         seconds=10.0, fps=30.0, lead_in_s=0.0)
-    job.start()
-    assert wait_until(qapp, lambda: cams)
-    job.cancel()
-    assert wait_until(qapp, lambda: outcomes, timeout=1.0)
-    assert outcomes[0].cancelled and outcomes[0].model is None
-    assert cams[0].released and "DONE" not in cues
-
-
-def test_calibration_job_runs_both_phases_with_cues(qapp):
-    cues, outcomes = [], []
-    phase = {"yaw": -32.0}
-
-    def cue(name):
-        cues.append(name)
-        phase["yaw"] = -32.0 if name == "LG" else -2.0
-
-    rng = np.random.default_rng(5)
-    tracker = FakeTracker(yaw_of=lambda n: phase["yaw"] + rng.normal(0, 2))
-    job = CalibrationJob(FakeCamera, lambda: tracker, cue=cue, on_done=outcomes.append,
-                         seconds=1.8, fps=80.0, lead_in_s=0.0)
-    job.start()
-    assert wait_until(qapp, lambda: outcomes, timeout=10.0)
-    o = outcomes[0]
-    assert o.error is None and o.model is not None and o.backend == "FAKE"
-    assert cues == ["LG", "LAPTOP", "DONE"] and set(o.samples) == {"LG", "LAPTOP"}
-
-
-def test_calibration_job_reports_a_camera_failure(qapp):
-    outcomes = []
-    job = CalibrationJob(lambda: None, FakeTracker, cue=lambda n: None, on_done=outcomes.append)
-    job.start()  # keep `job` referenced until on_done: its bridge delivers the result
-    assert wait_until(qapp, lambda: outcomes)
-    assert outcomes[0].model is None and "camera" in outcomes[0].error
+def test_the_worker_remembers_the_camera_backend(qapp):
+    w = CameraWorker(FakeCamera, FakeTracker, on_sample=lambda s: None, on_failed=print, on_crashed=print)
+    assert w.backend is None
+    w.start()
+    assert wait_until(qapp, lambda: w.backend == "FAKE")  # saved with a calibration made from its samples
+    w.stop()
 
 
 def test_no_preview_frames_unless_asked(qapp):

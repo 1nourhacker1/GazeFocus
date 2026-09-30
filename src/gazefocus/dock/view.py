@@ -55,7 +55,7 @@ def view_for(
     if status in PAUSED_TITLES:
         return DockView(PAUSED, focus, face, None, False, PAUSED_TITLES[status], "camera off")
     if status is Status.CALIBRATING:
-        return DockView(IDLE, focus, face, None, False, "Calibrating…", "listen for the beeps")
+        return DockView(IDLE, focus, face, None, False, "Calibrating…", "follow the drop  ·  Esc cancels")
     return DockView(ALERT, focus, face, None, False, ALERT_TITLES.get(status, status.value), "details in the tray")
 
 

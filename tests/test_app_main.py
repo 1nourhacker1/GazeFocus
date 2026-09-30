@@ -15,6 +15,7 @@ from gazefocus.storage import calibration_path
 from gazefocus.types import HeadSample, Zone
 from gazefocus.win.focus import SwitchResult
 from gazefocus.win.monitors import MonitorInfo
+from gazefocus.win.rawinput import VK_ESCAPE, RawEvent
 
 LAP = MonitorInfo(r"\\.\FAKE1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True)
 LG = MonitorInfo(r"\\.\FAKE5", "id-lg", (-1920, -302, 0, 778), (-1920, -302, 0, 738), False)
@@ -90,8 +91,73 @@ class FakeDock:
     def set_freeze(self, seconds):
         self.freezes.append(seconds)
 
+    modal = None
+    raised = 0
+
+    def show_intro(self, on_start, on_cancel):
+        self.modal, self.actions = "intro", {"start": on_start, "cancel": on_cancel}
+
+    def show_result(self, result, on_save, on_redo):
+        self.modal, self.result, self.actions = "result", result, {"save": on_save, "redo": on_redo}
+
+    def close_modal(self):
+        self.modal, self.actions = None, {}
+
+    def press(self, name):
+        self.actions[name]()
+
+    def pill_centre(self):
+        return (1280.0, 30.0)
+
+    def raise_to_top(self):
+        self.raised += 1
+        return True
+
     def close(self):
         self.closed = True
+
+
+class FakeRun:
+    """Stands in for calib.run.CalibrationRun: the test decides when (and how) it ends."""
+
+    made = []
+
+    def __init__(self, screens, dock, *, on_done, cue, on_open, **kw):
+        self.screens, self.dock_point, self.on_done, self.cue, self.on_open = screens, dock, on_done, cue, on_open
+        self.samples, self.started, self.cancelled, self.active = [], False, False, False
+        FakeRun.made.append(self)
+
+    def start(self):
+        self.started = self.active = True
+        self.on_open()
+
+    def on_sample(self, sample):
+        if self.active:
+            self.samples.append(sample)
+
+    def cancel(self):
+        self.cancelled, self.active = True, False
+
+    def finish(self, result):
+        self.active = False
+        self.cue("DONE")
+        self.on_done(result)
+
+
+def cal_result(lg_yaw=30.0, lap_yaw=0.0):
+    """A finished run's result: 60 face samples per screen."""
+    import random
+
+    from gazefocus.calib.session import CalibrationResult
+    from gazefocus.logic.classifier import fit_zone_model, quality
+
+    rng = random.Random(7)
+    lg = [HeadSample(i, True, lg_yaw + rng.gauss(0, 2), 10 + rng.gauss(0, 2), 0.0) for i in range(60)]
+    lap = [HeadSample(i, True, lap_yaw + rng.gauss(0, 2), 10 + rng.gauss(0, 2), 0.0) for i in range(60)]
+    m = fit_zone_model(lg, lap)
+    q = quality(m.separation)
+    return CalibrationResult(m, {"LG": lg, "LAPTOP": lap}, {"LG": 60, "LAPTOP": 60}, q,
+                             "Calibrated ✓" if q != "too close" else "Too close", "")
 
 
 class FakeDesktop:
@@ -135,6 +201,7 @@ def wait_until(qapp, predicate, timeout=5.0):
 def rig(qapp):
     FakeTracker.yaw = 0.0
     cams, beeps, desktop = [], [], FakeDesktop()
+    FakeRun.made = []
     state = {"camera_ok": True, "fullscreen": False}
     docks = []
 
@@ -148,13 +215,19 @@ def rig(qapp):
     app = GazeFocusApp(
         Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY)), open_camera=open_camera, make_tracker=FakeTracker, beep=beeps.append, qapp=qapp,
         log=log, dlog=logging.getLogger("test.app.decisions"), desktop_factory=desktop,
-        monitors=lambda: [LAP, LG], calibration_seconds=1.8, calibration_lead_in_s=0.0,
+        monitors=lambda: [LAP, LG],
         dock_factory=lambda cfg, **cb: docks.append(FakeDock(cfg, **cb)) or docks[-1],
         screen_work=lambda m: m.work, fullscreen_on=lambda device, rect: state["fullscreen"],
+        screen_rect=rect_of, run_factory=FakeRun, first_run=False,
     )
     state["docks"] = docks
     yield app, desktop, cams, beeps, state
     app.close()
+
+
+def rect_of(m):
+    x0, y0, x1, y1 = m.rect
+    return (x0, y0, x1 - x0, y1 - y0)
 
 
 def calibrate_fake():
@@ -228,66 +301,215 @@ def test_a_changed_layout_stops_switching(rig):
     assert app.state.status is Status.LAYOUT_CHANGED
 
 
-def test_recalibrate_from_the_tray_saves_and_resumes(rig, qapp):
-    app, _, _, beeps, _ = rig
+def running_app(rig):
+    app = rig[0]
+    calibrate_fake()
+    app.refresh_layout()
+    app.apply()
+    return app
 
-    def cue(name):
-        beeps.append(name)
-        FakeTracker.yaw = 30.0 if name == "LG" else 0.0
 
-    app.beep = cue
-    app.cfg = replace(app.cfg, camera=replace(app.cfg.camera, fps=60))  # (1.8 s - 1.0 s settle) x 60 = 48 samples
+def start_run(rig, qapp):
+    """Recalibrate, then press Start on the intro."""
+    app, state = rig[0], rig[4]
+    dock = state["docks"][-1]
     app.recalibrate()
-    assert app.state.status is Status.CALIBRATING and not app.worker.running
-    assert wait_until(qapp, lambda: not app.state.calibrating, timeout=15.0)
-    assert beeps == ["LG", "LAPTOP", "DONE"]
-    assert app.state.status is Status.RUNNING and app.worker.running
+    assert dock.modal == "intro" and not app.state.calibrating  # the intro first; tracking goes on meanwhile
+    dock.press("start")
+    return app, dock, FakeRun.made[-1]
+
+
+def test_recalibrate_opens_the_intro_and_start_runs_on_the_tracking_camera(rig, qapp):
+    app, desktop = running_app(rig), rig[1]
+    app, dock, run = start_run(rig, qapp)
+    assert dock.modal is None and run.started and dock.raised == 1  # the dock is lifted above the overlay
+    assert app.state.status is Status.CALIBRATING and app.worker.running
+    assert run.screens == {"LG": rect_of(LG), "LAPTOP": rect_of(LAP)} and run.dock_point == (1280.0, 30.0)
+    FakeTracker.yaw = 30.0  # looking at the LG must not switch focus while calibrating
+    assert wait_until(qapp, lambda: len(run.samples) >= 5)
+    assert desktop.brought == []
+
+
+def test_not_now_keeps_the_old_calibration_tracking(rig, qapp):
+    app = running_app(rig)
+    dock = rig[4]["docks"][-1]
+    app.recalibrate()
+    dock.press("cancel")
+    assert dock.modal is None and FakeRun.made == [] and app.state.status is Status.RUNNING
+
+
+def test_the_first_calibration_turns_the_camera_on(rig, qapp):
+    app, cams = rig[0], rig[2]
+    assert app.state.status is Status.NOT_CALIBRATED and cams == []
+    app, dock, run = start_run(rig, qapp)
+    assert app.worker.running and wait_until(qapp, lambda: run.samples)
+
+
+def test_save_commits_the_result_and_tracking_resumes(rig, qapp):
+    app, _, _, beeps, _ = rig
+    app, dock, run = start_run(rig, qapp)
+    assert wait_until(qapp, lambda: app.worker.backend == "FAKE")
+    run.finish(cal_result(28.0))
+    assert dock.modal == "result" and dock.result.can_save and app.state.status is Status.CALIBRATING
+    assert wait_until(qapp, lambda: beeps == ["DONE"])  # played off the Qt thread
+    dock.press("save")
+    assert dock.modal is None and app.state.status is Status.RUNNING and app.worker.running
+    from gazefocus.storage import load_if_matches
+    from gazefocus.win.monitors import layout_fingerprint
+
+    cal, _ = load_if_matches(calibration_path(), layout_fingerprint([LAP, LG]))
+    assert cal.camera["backend"] == "FAKE" and abs(cal.model.mean_lg[0] - 28.0) < 1.5
+
+
+def test_the_result_panel_shows_the_new_model_live_without_switching(rig, qapp):
+    app, desktop = running_app(rig), rig[1]
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app._on_sample(HeadSample(time.perf_counter(), True, yaw=30.0, pitch=10.0))
+    app._on_sample(HeadSample(time.perf_counter(), True, yaw=30.0, pitch=10.0))
+    assert dock.views[-1].mode == "tracking" and dock.views[-1].focus is Zone.LG  # the water follows the new model
+    assert desktop.brought == []
+
+
+def test_redo_starts_a_new_run_without_the_intro(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    dock.press("redo")
+    assert len(FakeRun.made) == 2 and FakeRun.made[-1].started and dock.modal is None
+    assert app.state.status is Status.CALIBRATING
+
+
+def test_a_result_too_close_to_save_offers_only_redo(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result(1.0))
+    assert not dock.result.can_save and "save" in dock.actions  # the dock refuses its Save; the app would too
+    before = calibration_path().exists()
+    dock.press("save")
+    assert calibration_path().exists() == before
+
+
+def test_esc_cancels_the_run_and_keeps_the_calibration(rig, qapp):
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    app.input.on_event(time.perf_counter(), RawEvent("key", False, key_down=True, vkey=VK_ESCAPE))
+    assert run.cancelled and app.state.status is Status.RUNNING and dock.modal is None
+    assert calibration_path().read_text() == before
+
+
+def test_esc_on_the_result_panel_discards_it(rig, qapp):
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    app.input.on_event(time.perf_counter(), RawEvent("key", False, key_down=True, vkey=VK_ESCAPE))
+    assert dock.modal is None and app.state.status is Status.RUNNING
+    assert calibration_path().read_text() == before
+
+
+def test_other_keys_do_not_cancel(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    app.input.on_event(time.perf_counter(), RawEvent("key", False, key_down=True, vkey=0x41))
+    assert not run.cancelled and app.state.calibrating
 
 
 @pytest.mark.parametrize("flag", ["paused", "locked", "suspended"])
-def test_pause_lock_or_sleep_during_recalibrate_cancels_it(rig, qapp, flag):
-    app, _, cams, beeps, _ = rig
-    calibrate_fake()
+def test_pause_lock_or_sleep_cancels_the_intro_or_the_run(rig, qapp, flag):
+    app = running_app(rig)
     before = calibration_path().read_text()
-    app.calibration_seconds = 10.0
+    dock = rig[4]["docks"][-1]
     app.recalibrate()
-    assert wait_until(qapp, lambda: cams)  # the calibration has the camera
     app._set(flag, True)
-    assert wait_until(qapp, lambda: cams[-1].released, timeout=1.0)
-    assert wait_until(qapp, lambda: not app.state.calibrating, timeout=1.0)
-    assert not app.worker.running and "DONE" not in beeps
+    assert dock.modal is None and FakeRun.made == []
+    app._set(flag, False)
+    app, dock, run = start_run(rig, qapp)
+    app._set(flag, True)
+    assert run.cancelled and not app.state.calibrating and not app.worker.running
     assert calibration_path().read_text() == before  # the good calibration is kept
 
 
 def test_recalibrate_is_refused_without_two_monitors(rig):
-    app, _, cams, beeps, _ = rig
+    app, _, cams, beeps, state = rig
     calibrate_fake()
     before = calibration_path().read_text()
     app._monitors_fn = lambda: [LAP]  # the LG was unplugged
     app.refresh_layout()
     app.apply()
     app.recalibrate()
-    assert not app.state.calibrating and app._job is None and cams == [] and beeps == []
+    assert state["docks"][-1].modal is None and FakeRun.made == [] and not app.state.calibrating
     assert calibration_path().read_text() == before
 
 
-def test_a_layout_change_during_recalibrate_keeps_the_old_calibration(rig, qapp):
-    app, _, _, beeps, _ = rig
-    calibrate_fake()
+def test_a_layout_change_mid_run_cancels_it(rig, qapp):
+    app = running_app(rig)
     before = calibration_path().read_text()
-
-    def cue(name):
-        beeps.append(name)
-        FakeTracker.yaw = 30.0 if name == "LG" else 0.0
-        if name == "DONE":
-            app._monitors_fn = lambda: [LAP]  # the LG is unplugged just before the end
-
-    app.beep = cue
-    app.cfg = replace(app.cfg, camera=replace(app.cfg.camera, fps=60))
-    app.recalibrate()
-    assert wait_until(qapp, lambda: not app.state.calibrating, timeout=15.0)
-    assert beeps == ["LG", "LAPTOP", "DONE"]
+    app, dock, run = start_run(rig, qapp)
+    app._monitors_fn = lambda: [LAP]  # the LG is unplugged mid-run
+    app._relayout()
+    assert run.cancelled and not app.state.calibrating
     assert calibration_path().read_text() == before
+
+
+def test_a_layout_change_before_save_keeps_the_old_calibration(rig, qapp):
+    app = running_app(rig)
+    before = calibration_path().read_text()
+    app, dock, run = start_run(rig, qapp)
+    run.finish(cal_result())
+    moved = MonitorInfo(LG.device, LG.id, (2560, 0, 4480, 1080), (2560, 0, 4480, 1040), False)
+    app._monitors_fn = lambda: [LAP, moved]  # the LG moved before Save
+    dock.press("save")
+    assert calibration_path().read_text() == before and not app.state.calibrating
+
+
+def test_calibrating_samples_at_the_full_camera_rate(rig, qapp):
+    app, dock, run = start_run(rig, qapp)
+    app.input.last_key_t = app.input.last_mouse_t = time.perf_counter() - 3600  # idle for an hour
+    app.tick()
+    assert app.worker.fps == app.cfg.camera.fps
+
+
+def test_clicking_the_dock_alert_calibrates(rig):
+    app, _, _, _, state = rig
+    dock = state["docks"][-1]
+    assert app.state.status is Status.NOT_CALIBRATED
+    dock.cb["on_pill"]()
+    assert dock.modal == "intro" and not app.state.paused
+
+
+def test_first_run_opens_the_intro(qapp):
+    docks = []
+    app = GazeFocusApp(
+        Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY)), open_camera=lambda: None, make_tracker=FakeTracker,
+        beep=lambda n: None, qapp=qapp, log=logging.getLogger("test.app"),
+        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, LG],
+        dock_factory=lambda cfg, **cb: docks.append(FakeDock(cfg, **cb)) or docks[-1], screen_work=lambda m: m.work,
+        fullscreen_on=lambda d, r: False, screen_rect=rect_of, run_factory=FakeRun,
+    )
+    try:
+        assert docks[-1].modal == "intro"
+    finally:
+        app.close()
+
+
+def test_without_a_dock_the_run_starts_at_once_and_a_good_result_is_saved(qapp):
+    from gazefocus.config import DockCfg
+
+    FakeRun.made = []
+    app = GazeFocusApp(
+        Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY), dock=DockCfg(enabled=False)), open_camera=lambda: None,
+        make_tracker=FakeTracker, beep=lambda n: None, qapp=qapp, log=logging.getLogger("test.app"),
+        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, LG],
+        dock_factory=None, screen_work=lambda m: m.work, fullscreen_on=lambda d, r: False,
+        screen_rect=rect_of, run_factory=FakeRun, first_run=False,
+    )
+    try:
+        app.recalibrate()
+        run = FakeRun.made[-1]
+        assert run.started and run.dock_point == (1280.0, 30.0)  # the laptop's top centre
+        run.finish(cal_result())
+        assert calibration_path().exists() and app.state.calibration == "ok" and not app.state.calibrating
+    finally:
+        app.close()
 
 
 def test_the_rig_never_holds_the_real_pause_hotkey(rig):
@@ -320,9 +542,12 @@ def test_the_dock_follows_the_app_state(rig):
 
 
 def test_clicking_the_dock_pauses(rig):
-    app, _, _, _, state = rig
-    state["docks"][-1].cb["on_toggle_pause"]()
-    assert app.state.paused
+    app = running_app(rig)
+    dock = rig[4]["docks"][-1]
+    dock.cb["on_pill"]()
+    assert app.state.paused and dock.modal is None
+    dock.cb["on_toggle_pause"]()  # the panel's Resume
+    assert not app.state.paused
 
 
 def test_the_dock_hides_while_locked_or_under_a_fullscreen_app(rig):

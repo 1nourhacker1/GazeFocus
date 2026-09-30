@@ -30,7 +30,6 @@ def test_fresh_state_is_not_calibrated_and_camera_off():
         ("paused", True, Status.PAUSED),
         ("locked", True, Status.LOCKED),
         ("suspended", True, Status.SUSPENDED),
-        ("calibrating", True, Status.CALIBRATING),
         ("calibration", "layout_changed", Status.LAYOUT_CHANGED),
         ("calibration", "unsupported", Status.UNSUPPORTED),
         ("tracker_failures", MAX_TRACKER_FAILURES, Status.TRACKER_FAILED),
@@ -40,6 +39,14 @@ def test_each_reason_stops_switching_and_releases_the_camera(attr, value, status
     s = ready_state()
     setattr(s, attr, value)
     assert s.status is status and not s.switching and not s.camera_wanted
+
+
+def test_calibrating_uses_the_tracking_camera_but_never_switches():
+    s = ready_state()
+    s.calibrating = True
+    assert s.status is Status.CALIBRATING and s.camera_wanted and not s.switching
+    s.calibration = "missing"  # the first calibration, too
+    assert s.camera_wanted
 
 
 def test_camera_wait_keeps_retrying_but_does_not_switch():

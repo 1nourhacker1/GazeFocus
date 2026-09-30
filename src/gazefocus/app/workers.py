@@ -1,6 +1,6 @@
-"""Background threads: the tracking camera loop and the in-app calibration.
+"""The tracking camera loop, on a background thread (it also feeds the calibration: Plan 4).
 
-Both run on plain Python threads and report through a QObject bridge that lives on the Qt main
+It runs on a plain Python thread and reports through a QObject bridge that lives on the Qt main
 thread, so every callback runs on the main thread (Qt queues cross-thread signal emissions).
 """
 
@@ -8,15 +8,12 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
 import cv2
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
-from gazefocus.logic.classifier import ZoneModel
-from gazefocus.runtime import calibrate
 from gazefocus.types import HeadSample
 
 
@@ -42,7 +39,6 @@ class _Bridge(QObject):
     preview = Signal(object, object)  # (BGR frame, HeadSample)
     failed = Signal(str)
     crashed = Signal(str)
-    done = Signal(object)
 
 
 class CameraWorker:
@@ -61,6 +57,7 @@ class CameraWorker:
         self.open_camera, self.make_tracker = open_camera, make_tracker
         self.fps, self.max_missed_frames = fps, max_missed_frames
         self.preview_fps = 0.0  # > 0 while the dock's panel shows the camera
+        self.backend: str | None = None  # the last opened camera's backend, saved with a calibration
         self._bridge = _Bridge()
         self._bridge.sample.connect(on_sample)
         if on_preview is not None:
@@ -107,6 +104,7 @@ class CameraWorker:
         if cam is None:
             self._bridge.failed.emit("could not open the camera")
             return
+        self.backend = getattr(cam, "backend", None)
         tracker = None
         try:
             tracker = self.make_tracker()
@@ -131,104 +129,6 @@ class CameraWorker:
                 stop.wait(max(0.0, next_t - time.perf_counter()))
         except Exception as e:  # reported to the main thread, which restarts us (spec §12.1)
             self._bridge.crashed.emit(f"{type(e).__name__}: {e}")
-        finally:
-            cam.release()
-            if tracker is not None:
-                tracker.close()
-
-
-class CalibrationCancelled(Exception):
-    """Raised on the calibration thread once cancel() is called."""
-
-
-@dataclass(frozen=True)
-class CalibrationOutcome:
-    model: ZoneModel | None
-    counts: dict = field(default_factory=dict)
-    samples: dict = field(default_factory=dict)
-    backend: str | None = None
-    error: str | None = None
-    cancelled: bool = False
-
-
-class CalibrationJob:
-    """Runs the two-phase calibration on its own thread (the tracking camera must be stopped).
-
-    Keep a reference to the job until on_done fires: if it is garbage-collected, its signal
-    bridge goes with it and the queued result is dropped.
-    """
-
-    def __init__(
-        self,
-        open_camera: Callable[[], "CameraLike | None"],
-        make_tracker: Callable[[], TrackerLike],
-        *,
-        cue: Callable[[str], None],
-        on_done: Callable[[CalibrationOutcome], None],
-        say: Callable[[str], None] = lambda text: None,
-        seconds: float = 6.0,
-        fps: float = 15.0,
-        lead_in_s: float = 2.0,
-    ) -> None:
-        self.open_camera, self.make_tracker, self.cue, self.say = open_camera, make_tracker, cue, say
-        self.seconds, self.fps, self.lead_in_s = seconds, fps, lead_in_s
-        self._bridge = _Bridge()
-        self._bridge.done.connect(on_done)
-        self._thread: threading.Thread | None = None
-        self._cancel = threading.Event()
-
-    @property
-    def running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
-
-    def start(self) -> None:
-        if not self.running:
-            self._thread = threading.Thread(target=self._run, name="gazefocus-calibration", daemon=True)
-            self._thread.start()
-
-    def cancel(self, timeout: float = 0.5) -> None:
-        """Stop mid-run (pause, lock, sleep): the camera is released and on_done gets cancelled=True."""
-        self._cancel.set()
-        if self._thread is not None:
-            self._thread.join(timeout)
-
-    def _check(self) -> None:
-        if self._cancel.is_set():
-            raise CalibrationCancelled
-
-    def _sleep(self, seconds: float) -> None:
-        self._cancel.wait(seconds)
-        self._check()
-
-    def _cue(self, name: str) -> None:
-        self._check()
-        self.cue(name)
-
-    def _run(self) -> None:
-        cam = self.open_camera()
-        if cam is None:
-            self._bridge.done.emit(
-                CalibrationOutcome(None, error="could not open the camera", cancelled=self._cancel.is_set())
-            )
-            return
-        backend, tracker, samples = cam.backend, None, {}
-
-        def read_frame():
-            self._check()
-            return cam.read()
-
-        try:
-            self._check()
-            tracker = self.make_tracker()
-            model, counts = calibrate(
-                read_frame, tracker.process, seconds=self.seconds, fps=self.fps, say=self.say,
-                cue=self._cue, sleep=self._sleep, samples_out=samples, lead_in_s=self.lead_in_s,
-            )
-            self._bridge.done.emit(CalibrationOutcome(model, counts, samples, backend))
-        except CalibrationCancelled:
-            self._bridge.done.emit(CalibrationOutcome(None, backend=backend, error="cancelled", cancelled=True))
-        except Exception as e:
-            self._bridge.done.emit(CalibrationOutcome(None, samples=samples, backend=backend, error=str(e)))
         finally:
             cam.release()
             if tracker is not None:

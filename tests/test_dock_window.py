@@ -353,3 +353,25 @@ def test_the_intro_replacing_the_hover_panel_stops_the_preview(dock):
     assert calls[-1] == ("panel", False) and d.preview is None
     run_ticks(d, clock, ticker, 1.0)
     assert d.panel_size(clock.t) == geometry.PANELS["intro"]  # morphed from the hover panel's size
+
+
+def test_a_pill_click_goes_to_on_pill_when_the_app_gives_one(qapp):
+    calls = []
+    d = DockWindow(CFG, on_toggle_pause=lambda: calls.append("pause"), on_recalibrate=lambda: None,
+                   on_pill=lambda: calls.append("pill"), native=False, grabber_factory=FakeGrabber,
+                   ticker=ManualTicker(), clock=FakeClock(), seed=1)
+    try:
+        d.place((0, 0, 1707, 1067))
+        d.show()
+        p = closed_pill(d)
+        QTest.mouseClick(d, Qt.LeftButton, Qt.NoModifier, QPoint(int(p.cx), int(p.cy)))
+        assert calls == ["pill"]
+    finally:
+        d.close()
+
+
+def test_the_pill_centre_is_where_the_drop_leaves_from(dock):
+    d, clock, ticker, calls = dock
+    p = closed_pill(d)
+    assert d.pill_centre() == pytest.approx((d.x() + p.cx, d.y() + p.cy))
+    assert d.raise_to_top() is False  # not a native window on the test platform

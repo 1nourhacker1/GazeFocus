@@ -2,7 +2,9 @@
 
 Wiring: MessageWindow (Raw Input, hotkey, lock/sleep/display events) + WinEvent foreground hook
 + CameraWorker thread -> Controller -> real focus switch; Tray for status and control.
-The camera runs only while switching is possible; pause, lock and sleep release it.
+The camera runs only while switching is possible or while calibrating; pause, lock and sleep release it.
+Recalibrate (spec §9): the dock's intro -> a follow-the-drop run on the tracking camera -> the dock's
+result panel -> Save or Redo. Esc, Not now, pause, lock, sleep and a layout change cancel it.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from typing import Callable
 
@@ -19,7 +22,7 @@ from gazefocus.app.controller import Controller, Desktop
 from gazefocus.app.decision_log import DecisionLogger, setup_logging
 from gazefocus.app.state import MAX_TRACKER_FAILURES, AppState, Status
 from gazefocus.app.tray import Tray
-from gazefocus.app.workers import CalibrationJob, CalibrationOutcome, CameraWorker
+from gazefocus.app.workers import CameraWorker
 from gazefocus.calibration import commit_calibration
 from gazefocus.config import Config, ConfigWatcher, DockCfg, load_config, write_default_config
 from gazefocus.dock.view import view_for
@@ -30,9 +33,15 @@ from gazefocus.storage import calibration_path, load_if_matches
 from gazefocus.types import HeadSample, Zone
 from gazefocus.win import _api, focus, rawinput, system, windows
 from gazefocus.win.foreground import ForegroundHook, MruTracker
-from gazefocus.win.monitors import MonitorInfo, enumerate_monitors, ensure_dpi_awareness, layout_fingerprint
+from gazefocus.win.monitors import (
+    MonitorInfo,
+    enumerate_monitors,
+    ensure_dpi_awareness,
+    layout_fingerprint,
+    zone_monitors,
+)
 from gazefocus.win.msgwindow import MessageWindow
-from gazefocus.win.rawinput import InputTracker, InputWatcher
+from gazefocus.win.rawinput import VK_ESCAPE, InputTracker, InputWatcher
 from gazefocus.win.system import Hotkey, SingleInstance, SystemEvents
 
 CAMERA_RETRY_S = 5.0
@@ -64,6 +73,23 @@ def qt_work_area(monitor: MonitorInfo) -> tuple[int, int, int, int] | None:
             a = screen.availableGeometry()
             return a.left(), a.top(), a.right() + 1, a.bottom() + 1
     return None
+
+
+def qt_screen_rect(monitor: MonitorInfo) -> tuple[float, float, float, float] | None:
+    """A whole monitor as (x, y, w, h) in Qt's logical coordinates, matched by origin like `qt_work_area`."""
+    from PySide6.QtGui import QGuiApplication
+
+    for screen in QGuiApplication.screens():
+        g = screen.geometry()
+        if (g.left(), g.top()) == tuple(monitor.rect[:2]):
+            return float(g.left()), float(g.top()), float(g.width()), float(g.height())
+    return None
+
+
+def make_run(screens, dock, **kw):
+    from gazefocus.calib.run import CalibrationRun
+
+    return CalibrationRun(screens, dock, **kw)
 
 
 def make_dock(cfg: DockCfg, **callbacks):
@@ -102,23 +128,28 @@ class GazeFocusApp:
         dlog: logging.Logger,
         desktop_factory: Callable[[Callable[[str], object]], Desktop] = real_desktop,
         monitors: Callable[[], list[MonitorInfo]] = enumerate_monitors,
-        calibration_seconds: float = 6.0,
-        calibration_lead_in_s: float = 2.0,
         dock_factory: Callable[..., object] | None = make_dock,
         screen_work: Callable[[MonitorInfo], "tuple[int, int, int, int] | None"] = qt_work_area,
         fullscreen_on: Callable[[str, tuple[int, int, int, int]], bool] = windows.fullscreen_app_on,
+        screen_rect: Callable[[MonitorInfo], "tuple[float, float, float, float] | None"] = qt_screen_rect,
+        run_factory: Callable[..., object] = make_run,
+        first_run: bool = True,
     ) -> None:
         self.cfg, self.qapp, self.log, self.beep = cfg, qapp, log, beep
         self.open_camera, self.make_tracker = open_camera, make_tracker
         self.dlog = DecisionLogger(dlog)
         self._monitors_fn, self._desktop_factory = monitors, desktop_factory
-        self.calibration_seconds, self.calibration_lead_in_s = calibration_seconds, calibration_lead_in_s
         self.state = AppState()
         self.monitors: list[MonitorInfo] = []
         self._work_areas: dict[str, tuple[int, int, int, int]] = {}
         self.controller: Controller | None = None
-        self._job: CalibrationJob | None = None
-        self._job_layout: str | None = None  # the layout fingerprint the running calibration started on
+        self._screen_rect, self._run_factory = screen_rect, run_factory
+        self._intro = False  # the dock shows the calibration's intro
+        self._run = None  # the follow-the-drop run (calib.run.CalibrationRun)
+        self._result = None  # the finished run's CalibrationResult, while the dock shows it
+        self._cal_layout: str | None = None  # the layout fingerprint the calibration started on
+        self._preview = None  # a ZoneClassifier on the new model: the result panel's water follows it
+        self._preview_zone = Zone.UNKNOWN
         self._retry_at: float | None = None
         self._restart_at: float | None = None
         self._running_since: float | None = None
@@ -130,7 +161,7 @@ class GazeFocusApp:
         self._face_t: float | None = None  # when a face was last seen (None: not since the camera started)
 
         self.window = MessageWindow("GazeFocus")
-        self.input = InputTracker()
+        self.input = InputTracker(on_key=self._on_key)
         self.input_watcher = InputWatcher(self.window, self.input)
         self.mru = MruTracker()
         self.fg_hook = ForegroundHook(self._on_foreground)
@@ -161,6 +192,8 @@ class GazeFocusApp:
         self.config_watcher = ConfigWatcher(app_dir() / "config.toml", self._on_config)
         self.refresh_layout()
         self.apply()
+        if first_run and self.state.calibration == "missing":
+            self.recalibrate()  # the intro opens once at the first start (spec §9)
 
     # ---- layout, calibration, controller -------------------------------------------------
     def refresh_layout(self) -> None:
@@ -216,6 +249,12 @@ class GazeFocusApp:
         self._last_sample = sample
         if sample.face or self._face_t is None:  # a face, or the first frame since the camera started
             self._face_t = sample.t  # (so "nobody in view since the start" also becomes "no face" after 0.5 s)
+        if self._run is not None:
+            self._run.on_sample(sample)
+        elif self._preview is not None:
+            zone, _ = self._preview.update(sample)
+            if zone is not Zone.UNKNOWN:
+                self._preview_zone = zone
         if self.state.switching and self.controller is not None:
             self.controller.on_sample(sample)
         self._update_dock()
@@ -243,12 +282,23 @@ class GazeFocusApp:
     def _set(self, flag: str, value: bool) -> None:
         setattr(self.state, flag, value)
         self.log.info("%s -> %s", flag, value)
-        if value and self._job is not None and self._job.running:
-            self._job.cancel()  # pause, lock and sleep release the camera, even mid-calibration
+        if value:
+            self.cancel_calibration(flag)  # pause, lock and sleep release the camera, even mid-calibration
         self.apply()
 
     def toggle_pause(self) -> None:
         self._set("paused", not self.state.paused)
+
+    def _on_pill(self) -> None:
+        """A click on the collapsed dock: calibrate when it shows "!" for a missing calibration, else pause."""
+        if self.state.status in (Status.NOT_CALIBRATED, Status.LAYOUT_CHANGED):
+            self.recalibrate()
+        else:
+            self.toggle_pause()
+
+    def _on_key(self, vkey: int) -> None:
+        if vkey == VK_ESCAPE:
+            self.cancel_calibration("Esc")  # only listening: the focused app gets its Esc too
 
     def _on_foreground(self, hwnd: int) -> None:
         facts = windows.window_facts(hwnd)
@@ -264,8 +314,9 @@ class GazeFocusApp:
         if self.cfg.dock.enabled and self._dock_factory is not None:
             self.dock = self._dock_factory(
                 self.cfg.dock, on_toggle_pause=self.toggle_pause, on_recalibrate=self.recalibrate,
-                on_panel=self._on_panel, freeze_s=self.cfg.decider.typing_freeze_ms / 1000.0,
+                on_panel=self._on_panel, on_pill=self._on_pill, freeze_s=self.cfg.decider.typing_freeze_ms / 1000.0,
             )
+            self.worker.preview_fps = 0.0  # a new dock starts with its panel closed
 
     def _place_dock(self) -> None:
         want = self.cfg.dock.monitor  # the same choice as the LAPTOP zone (zone_monitors)
@@ -289,10 +340,16 @@ class GazeFocusApp:
         if self.dock is None:
             return
         now = time.perf_counter()
+        face = self._face_t is None or now - self._face_t < FACE_LOST_S
+        if self._preview is not None:  # the result panel: the water follows the new model, nothing switches
+            view = view_for(Status.RUNNING, focus=self._preview_zone, face=face, last_key_t=None, decision=None,
+                            sample=self._last_sample, now=now, freeze_s=0.0)
+            self.dock.set_view(view)
+            return
         view = view_for(
             self.state.status,
             focus=self.controller.focus_zone() if self.controller is not None else Zone.UNKNOWN,
-            face=self._face_t is None or now - self._face_t < FACE_LOST_S,
+            face=face,
             last_key_t=self.input.last_key_t,
             decision=self.controller.last_decision if self.controller is not None else None,
             sample=self._last_sample,
@@ -315,6 +372,8 @@ class GazeFocusApp:
 
     def _relayout(self) -> None:
         before = self.state.calibration
+        if self._run is not None and layout_fingerprint(self._monitors_fn()) != self._cal_layout:
+            self.cancel_calibration("the monitors changed", notify=True)  # the overlay no longer fits them
         self.refresh_layout()
         if self.state.calibration != before:
             self.tray.notify("GazeFocus", f"Monitor layout: {self.state.status.value}")
@@ -325,50 +384,128 @@ class GazeFocusApp:
         if hwnd:
             focus.bring_to_front(hwnd)
 
+    # ---- calibration (spec §9) ------------------------------------------------------------------
     def recalibrate(self) -> None:
-        if self._job is not None and self._job.running:
+        """The tray, the panel's Recalibrate, a click on the dock's "!" and the first start: the intro first."""
+        if self._intro or self._run is not None or self._result is not None:
             return
-        monitors = self._monitors_fn()
+        if self._screens(self._monitors_fn()) is None:
+            return
+        if self.dock is None:
+            self._start_run()  # no dock to ask in: start at once
+            return
+        self._intro = True
+        self.dock.show_intro(self._start_run, lambda: self.cancel_calibration("Not now"))
+        self.log.info("calibration: intro")
+
+    def _screens(self, monitors: list[MonitorInfo]) -> dict | None:
+        """{"LG": rect, "LAPTOP": rect} in Qt's logical coordinates, or None (and the user is told why)."""
         if len(monitors) != 2:
             self.tray.notify("Can't calibrate yet", f"GazeFocus needs 2 monitors and sees {len(monitors)}: "
                              "connect the LG, then Recalibrate.")
             self.log.warning("recalibrate refused: %d monitor(s)", len(monitors))
-            return
-        self._job_layout = layout_fingerprint(monitors)
-        self.state.calibrating = True
-        self.apply()  # stops the tracking camera: calibration needs it exclusively
-        self.tray.notify("Calibrating", "Listen: 1 beep = look at the LG, 2 beeps = the laptop, 3 = done.")
-        self._job = CalibrationJob(
-            self.open_camera, self.make_tracker, cue=self.beep, on_done=self._calibration_done,
-            say=self.log.info, seconds=self.calibration_seconds, fps=self.cfg.camera.fps,
-            lead_in_s=self.calibration_lead_in_s,
-        )
-        self._job.start()
+            return None
+        by_id = {m.id: m for m in monitors}
+        zones = zone_monitors(monitors, self.cfg.dock.monitor)
+        rects = {z: self._screen_rect(by_id[i]) if i in by_id else None for z, i in zones.items()}
+        if None in rects.values():
+            self.tray.notify("Can't calibrate yet", "GazeFocus could not find both screens.")
+            self.log.warning("recalibrate refused: screens %s", rects)
+            return None
+        return rects
 
-    def _calibration_done(self, outcome: CalibrationOutcome) -> None:
-        self.state.calibrating = False
+    def _start_run(self) -> None:
+        self._intro = False
+        if self.dock is not None:
+            self.dock.close_modal()
         monitors = self._monitors_fn()
-        if outcome.cancelled:
-            self.tray.notify("Calibration cancelled", "The previous calibration was kept.")
-            self.log.info("calibration cancelled")
-        elif outcome.model is None:
-            self.tray.notify("Calibration failed", outcome.error or "unknown error")
-            self.log.warning("calibration failed: %s", outcome.error)
-        elif layout_fingerprint(monitors) != self._job_layout:
+        screens = self._screens(monitors)
+        if screens is None:
+            return
+        self._cal_layout = layout_fingerprint(monitors)
+        self.state.calibrating = True
+        if self.dock is not None:
+            dock_point = self.dock.pill_centre()
+        else:
+            x, y, w, _ = screens["LAPTOP"]
+            dock_point = (x + w / 2, y + 30.0)
+        self._run = self._run_factory(
+            screens, dock_point, on_done=self._run_done, cue=self._cue, on_open=self._lift_dock,
+            refraction=self.cfg.dock.refraction,
+        )
+        self.worker.fps = float(self.cfg.camera.fps)  # every sample counts: no idle or battery rate
+        self.apply()  # the tracking camera stays on (or starts): the run samples it
+        self._run.start()
+        self.log.info("calibration started")
+
+    def _lift_dock(self) -> None:
+        if self.dock is not None:
+            self.dock.raise_to_top()  # the overlay was shown after the dock
+
+    def _cue(self, name: str) -> None:
+        """The beeps (1 = LG, 2 = laptop, 3 = done), off the Qt thread: winsound.Beep blocks."""
+        threading.Thread(target=self.beep, args=(name,), name="gazefocus-beep", daemon=True).start()
+
+    def _run_done(self, result) -> None:
+        self._run = None
+        sep = f"{result.model.separation:.1f} sigma" if result.model is not None else "no model"
+        self.log.info("calibration run: %s (%s; samples %s)", result.title, sep, result.counts)
+        self._result = result
+        if self.dock is None:
+            if result.can_save:
+                self._save()
+            else:
+                self.tray.notify(result.title, result.message)
+                self.cancel_calibration(result.title)
+            return
+        if result.can_save:
+            self._preview = ZoneClassifier(result.model, self.cfg.classifier)
+            self._preview_zone = Zone.UNKNOWN
+        self.dock.show_result(result, self._save, self._redo)
+        self._update_dock()
+
+    def _save(self) -> None:
+        result = self._result
+        if result is None or not result.can_save:
+            return  # the dock offers no Save for it; nothing to do
+        self._end_calibration()
+        monitors = self._monitors_fn()
+        if layout_fingerprint(monitors) != self._cal_layout:
             self.tray.notify("Calibration not saved", "The monitors changed during calibration. "
                              "The previous calibration was kept.")
             self.log.warning("calibration not saved: the monitor layout changed during it")
-            self.refresh_layout()
         else:
             cam = self.cfg.camera
-            result = commit_calibration(
-                outcome.model, outcome.counts, outcome.samples, monitors=monitors,
-                dock_monitor=self.cfg.dock.monitor,
-                camera={"index": cam.index, "width": cam.width, "height": cam.height, "backend": outcome.backend},
+            commit = commit_calibration(
+                result.model, result.counts, result.samples, monitors=monitors, dock_monitor=self.cfg.dock.monitor,
+                camera={"index": cam.index, "width": cam.width, "height": cam.height, "backend": self.worker.backend},
             )
-            self.tray.notify("Calibration saved" if result.saved else "Calibration not saved", result.message)
-            self.log.info(result.message)
-            self.refresh_layout()
+            self.tray.notify("Calibration saved" if commit.saved else "Calibration not saved", commit.message)
+            self.log.info(commit.message)
+        self.refresh_layout()
+        self.apply()
+
+    def _redo(self) -> None:
+        self._result, self._preview = None, None
+        self._start_run()  # straight to the LG: no intro
+
+    def _end_calibration(self) -> None:
+        if self._run is not None:
+            self._run.cancel()
+        self._run = self._result = self._preview = None
+        self._intro = False
+        if self.dock is not None:
+            self.dock.close_modal()
+        self.state.calibrating = False
+
+    def cancel_calibration(self, why: str, notify: bool = False) -> None:
+        """Esc, Not now, pause, lock, sleep, a layout change: the previous calibration stays."""
+        if not (self._intro or self._run is not None or self._result is not None):
+            return
+        self._end_calibration()
+        self.log.info("calibration cancelled: %s", why)
+        if notify:
+            self.tray.notify("Calibration cancelled", f"{why[0].upper()}{why[1:]}. The previous calibration was kept.")
         self.apply()
 
     def _on_config(self, cfg: Config, warnings: list[str]) -> None:
@@ -406,10 +543,11 @@ class GazeFocusApp:
         now = time.perf_counter()
         self.config_watcher.poll()
         fps = float(self.cfg.camera.fps)
-        if self.input.idle_s(now) >= self.cfg.camera.idle_after_s:
-            fps = float(self.cfg.camera.idle_fps)
-        if system.on_battery():
-            fps = min(fps, float(self.cfg.camera.battery_fps))
+        if not self.state.calibrating:  # a calibration samples at the full rate
+            if self.input.idle_s(now) >= self.cfg.camera.idle_after_s:
+                fps = float(self.cfg.camera.idle_fps)
+            if system.on_battery():
+                fps = min(fps, float(self.cfg.camera.battery_fps))
         self.worker.fps = fps
         if self._retry_at is not None and now >= self._retry_at:
             self._retry_at, self.state.camera_ok = None, True  # try again; a failure re-arms the timer
@@ -432,8 +570,7 @@ class GazeFocusApp:
         self.qapp.quit()
 
     def close(self) -> None:
-        if self._job is not None:
-            self._job.cancel()
+        self._end_calibration()
         self.worker.stop(timeout=3.0)
         for part in (self.dock, self.fg_hook, self.input_watcher, self.system_events, self.hotkey, self.tray,
                      self.window):

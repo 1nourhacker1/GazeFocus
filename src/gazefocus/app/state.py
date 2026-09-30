@@ -56,8 +56,9 @@ class AppState:
 
     @property
     def camera_wanted(self) -> bool:
-        """The tracking camera runs only while switching is possible (or retrying to become so)."""
-        return self.status in (Status.RUNNING, Status.CAMERA_WAIT)
+        """The tracking camera runs while switching is possible (or retrying to become so), and while
+        calibrating: the calibration overlay samples the same camera (Plan 4)."""
+        return self.status in (Status.RUNNING, Status.CAMERA_WAIT, Status.CALIBRATING)
 
     @property
     def switching(self) -> bool:
