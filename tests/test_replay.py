@@ -70,3 +70,14 @@ def test_replay_ignores_the_recorded_simulated_switches_of_another_model():
         data.append((HeadSample(t, True, yaw=0.0), Context(t=t, focus_zone=recorded_focus)))
     decisions = replay(data, TOY)
     assert [d for d in decisions if d.action == "switch"] == []
+
+
+def test_recordings_never_hold_face_positions(tmp_path):
+    p = tmp_path / "rec.jsonl"
+    s = HeadSample(t=1.0, face=True, yaw=-20.0, box=(0.1, 0.2, 0.3, 0.4), nose=(0.2, 0.3))
+    with Recorder(p) as rec:
+        rec.write(s, Context(t=1.0, focus_zone=Zone.LAPTOP))
+    text = p.read_text(encoding="utf-8")
+    assert "box" not in text and "nose" not in text and "-20.0" in text
+    (read_back, _), = read_recording(p)
+    assert read_back.yaw == -20.0 and read_back.box is None

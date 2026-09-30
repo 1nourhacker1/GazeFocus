@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import json
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 from gazefocus.logic.classifier import ZoneModel, quality
 from gazefocus.storage import Calibration, calibration_path, now_iso, save_calibration
-from gazefocus.types import HeadSample
+from gazefocus.types import HeadSample, recordable
 from gazefocus.win.monitors import MonitorInfo, layout_fingerprint, zone_monitors
 
 SAMPLES_FILE = "calibration-samples.jsonl"
@@ -31,7 +31,7 @@ def save_samples(path: Path, samples: dict[str, Sequence[HeadSample]]) -> None:
     with path.open("w", encoding="utf-8") as f:
         for screen, items in samples.items():
             for s in items:
-                f.write(json.dumps({"screen": screen, **asdict(s)}) + "\n")
+                f.write(json.dumps({"screen": screen, **recordable(s)}) + "\n")
 
 
 def load_samples(path: Path) -> dict[str, list[HeadSample]]:

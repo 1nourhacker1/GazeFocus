@@ -10,7 +10,7 @@ from typing import Iterable, Iterator
 from gazefocus.config import Config
 from gazefocus.logic.classifier import ZoneClassifier, ZoneModel
 from gazefocus.logic.decider import Context, GazeDecider, reason_category
-from gazefocus.types import Decision, HeadSample, Zone
+from gazefocus.types import Decision, HeadSample, Zone, recordable
 
 
 def _ctx_to_dict(ctx: Context) -> dict:
@@ -31,7 +31,7 @@ class Recorder:
         self._f = path.open("w", encoding="utf-8")
 
     def write(self, sample: HeadSample, ctx: Context) -> None:
-        self._f.write(json.dumps({"sample": asdict(sample), "ctx": _ctx_to_dict(ctx)}) + "\n")
+        self._f.write(json.dumps({"sample": recordable(sample), "ctx": _ctx_to_dict(ctx)}) + "\n")
 
     def close(self) -> None:
         self._f.close()

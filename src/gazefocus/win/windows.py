@@ -135,3 +135,25 @@ def choose_target(
             if f.device == device and is_switch_target(f)[0]:
                 return hwnd
     return None
+
+
+def covers(rect: tuple[int, int, int, int], monitor: tuple[int, int, int, int]) -> bool:
+    return rect[0] <= monitor[0] and rect[1] <= monitor[1] and rect[2] >= monitor[2] and rect[3] >= monitor[3]
+
+
+def is_fullscreen(f: WindowFacts, rect: tuple[int, int, int, int], monitor: tuple[int, int, int, int],
+                  device: str, zoomed: bool) -> bool:
+    """A game, a video, a presentation or F11 covering `device`. Maximized windows don't count:
+    with an auto-hiding taskbar they cover the whole monitor too."""
+    if not f.exists or f.own_process or f.class_name in SHELL_CLASSES or f.device != device or zoomed:
+        return False
+    return covers(rect, monitor)
+
+
+def fullscreen_app_on(device: str, monitor: tuple[int, int, int, int]) -> bool:
+    hwnd = _api.user32.GetForegroundWindow() or 0
+    f = window_facts(hwnd)
+    r = wintypes.RECT()
+    if not f.exists or not _api.user32.GetWindowRect(hwnd, ctypes.byref(r)):
+        return False
+    return is_fullscreen(f, (r.left, r.top, r.right, r.bottom), monitor, device, bool(_api.user32.IsZoomed(hwnd)))

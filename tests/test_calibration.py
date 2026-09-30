@@ -51,3 +51,10 @@ def test_samples_round_trip(tmp_path):
     p = tmp_path / "s.jsonl"
     save_samples(p, SAMPLES)
     assert load_samples(p) == SAMPLES
+
+
+def test_saved_samples_never_hold_face_positions(tmp_path):
+    p = tmp_path / "s.jsonl"
+    save_samples(p, {"LG": [HeadSample(t=1.0, face=True, yaw=30.0, box=(0.1, 0.2, 0.3, 0.4), nose=(0.2, 0.3))]})
+    assert "box" not in p.read_text(encoding="utf-8")
+    assert load_samples(p)["LG"][0].yaw == 30.0

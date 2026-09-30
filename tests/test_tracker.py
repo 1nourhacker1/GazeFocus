@@ -51,3 +51,11 @@ def test_detect_returns_the_raw_result():
 def test_missing_model_says_how_to_fetch_it(tmp_path):
     with pytest.raises(FileNotFoundError, match="fetch_model.py"):
         HeadTracker(tmp_path / "nope.task")
+
+
+def test_face_result_carries_the_face_box_and_nose_for_the_preview():
+    lm = [SimpleNamespace(x=0.3 + 0.001 * i, y=0.2 + 0.001 * i, z=0.0) for i in range(478)]
+    r = SimpleNamespace(face_landmarks=[lm], facial_transformation_matrixes=[np.eye(4)])
+    s = sample_from_result(r, 1.0)
+    assert s.box == pytest.approx((0.3, 0.2, 0.3 + 0.477, 0.2 + 0.477))
+    assert s.nose == pytest.approx((0.301, 0.201))  # landmark 1 is the nose tip

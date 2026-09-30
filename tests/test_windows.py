@@ -2,7 +2,15 @@ import pytest
 
 from gazefocus.win import _api
 from gazefocus.win.msgwindow import MessageWindow
-from gazefocus.win.windows import WindowFacts, choose_target, is_switch_target, top_level_windows, window_facts
+from gazefocus.win.windows import (
+    WindowFacts,
+    choose_target,
+    covers,
+    is_fullscreen,
+    is_switch_target,
+    top_level_windows,
+    window_facts,
+)
 
 LG, LAP = r"\\.\DISPLAY5", r"\\.\DISPLAY1"
 
@@ -72,3 +80,29 @@ def test_facts_of_a_dead_handle():
 def test_facts_of_the_live_foreground_window_are_readable():
     f = window_facts(_api.user32.GetForegroundWindow())
     assert isinstance(f.title, str) and isinstance(f.class_name, str)
+
+
+MON = (0, 0, 2560, 1600)
+
+
+def test_covers_needs_the_whole_monitor():
+    assert covers((0, 0, 2560, 1600), MON) and covers((-8, -8, 2568, 1608), MON)
+    assert not covers((0, 0, 2560, 1552), MON)  # stops at the taskbar
+
+
+def test_a_borderless_window_over_the_monitor_is_fullscreen():
+    assert is_fullscreen(good(7, device=LAP), (0, 0, 2560, 1600), MON, LAP, zoomed=False)
+
+
+@pytest.mark.parametrize(
+    "facts, rect, zoomed",
+    [
+        (good(7, device=LAP), (-8, -8, 2568, 1608), True),  # maximized, with an auto-hiding taskbar
+        (good(7, device=LAP), (100, 100, 900, 700), False),  # an ordinary window
+        (good(7, device=LG), (0, 0, 2560, 1600), False),  # on the other monitor
+        (WindowFacts(7, True, visible=True, class_name="Progman", device=LAP), (0, 0, 2560, 1600), False),  # desktop
+        (good(7, device=LAP, own_process=True), (0, 0, 2560, 1600), False),  # the dock itself
+    ],
+)
+def test_what_is_not_fullscreen(facts, rect, zoomed):
+    assert not is_fullscreen(facts, rect, MON, LAP, zoomed)

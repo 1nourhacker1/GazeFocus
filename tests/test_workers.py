@@ -172,3 +172,30 @@ def test_calibration_job_reports_a_camera_failure(qapp):
     job.start()  # keep `job` referenced until on_done: its bridge delivers the result
     assert wait_until(qapp, lambda: outcomes)
     assert outcomes[0].model is None and "camera" in outcomes[0].error
+
+
+def test_no_preview_frames_unless_asked(qapp):
+    previews = []
+    w = CameraWorker(FakeCamera, FakeTracker, on_sample=lambda s: None, on_failed=print, on_crashed=print,
+                     on_preview=lambda f, s: previews.append(f), fps=60.0)
+    w.start()
+    time.sleep(0.3)
+    w.stop()
+    qapp.processEvents()
+    assert previews == []
+
+
+def test_preview_frames_are_small_and_paced(qapp):
+    previews = []
+    w = CameraWorker(FakeCamera, FakeTracker, on_sample=lambda s: None, on_failed=print, on_crashed=print,
+                     on_preview=lambda f, s: previews.append((f, s)), fps=60.0)
+    w.preview_fps = 10.0
+    w.start()
+    assert wait_until(qapp, lambda: len(previews) >= 3)
+    time.sleep(0.5)
+    w.stop()
+    qapp.processEvents()
+    frame, sample = previews[0]
+    assert frame.shape == (120, 160, 3) and sample.face
+    ts = [s.t for _, s in previews]
+    assert min(b - a for a, b in zip(ts, ts[1:])) >= 0.099  # about 10 per second, not 60

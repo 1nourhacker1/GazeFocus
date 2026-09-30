@@ -23,8 +23,11 @@ def sample_from_result(result, t: float) -> HeadSample:
     if not result.face_landmarks or not result.facial_transformation_matrixes:
         return HeadSample(t=t, face=False)
     yaw, pitch, _roll = yaw_pitch_roll(result.facial_transformation_matrixes[0])
-    iris_h, iris_v = iris_offsets([(p.x, p.y) for p in result.face_landmarks[0]])
-    return HeadSample(t=t, face=True, yaw=yaw, pitch=pitch, iris_h=iris_h, iris_v=iris_v)
+    pts = [(p.x, p.y) for p in result.face_landmarks[0]]
+    iris_h, iris_v = iris_offsets(pts)
+    xs, ys = [x for x, _ in pts], [y for _, y in pts]
+    return HeadSample(t=t, face=True, yaw=yaw, pitch=pitch, iris_h=iris_h, iris_v=iris_v,
+                      box=(min(xs), min(ys), max(xs), max(ys)), nose=pts[1])
 
 
 class HeadTracker:

@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
+import cv2
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
@@ -33,8 +34,12 @@ class TrackerLike(Protocol):
     def close(self) -> None: ...
 
 
+PREVIEW_SIZE = (160, 120)  # the dock's camera preview (spec §8.4): small, and only while the panel is open
+
+
 class _Bridge(QObject):
     sample = Signal(object)
+    preview = Signal(object, object)  # (BGR frame, HeadSample)
     failed = Signal(str)
     crashed = Signal(str)
     done = Signal(object)
@@ -49,13 +54,17 @@ class CameraWorker:
         on_sample: Callable[[HeadSample], None],
         on_failed: Callable[[str], None],
         on_crashed: Callable[[str], None],
+        on_preview: Callable[[np.ndarray, HeadSample], None] | None = None,
         fps: float = 15.0,
         max_missed_frames: int = 30,
     ) -> None:
         self.open_camera, self.make_tracker = open_camera, make_tracker
         self.fps, self.max_missed_frames = fps, max_missed_frames
+        self.preview_fps = 0.0  # > 0 while the dock's panel shows the camera
         self._bridge = _Bridge()
         self._bridge.sample.connect(on_sample)
+        if on_preview is not None:
+            self._bridge.preview.connect(on_preview)
         self._bridge.failed.connect(on_failed)
         self._bridge.crashed.connect(on_crashed)
         self._stop = threading.Event()  # the current run's; every run gets its own
@@ -101,7 +110,7 @@ class CameraWorker:
         tracker = None
         try:
             tracker = self.make_tracker()
-            missed, next_t = 0, time.perf_counter()
+            missed, next_t, last_preview = 0, time.perf_counter(), float("-inf")
             while not stop.is_set():
                 frame = cam.read()
                 if frame is None:
@@ -111,7 +120,13 @@ class CameraWorker:
                         return
                     continue
                 missed = 0
-                self._bridge.sample.emit(tracker.process(frame, time.perf_counter()))
+                sample = tracker.process(frame, time.perf_counter())
+                self._bridge.sample.emit(sample)
+                rate = self.preview_fps
+                if rate > 0 and sample.t - last_preview >= 1.0 / rate:
+                    last_preview = sample.t
+                    small = cv2.resize(frame, PREVIEW_SIZE, interpolation=cv2.INTER_AREA)
+                    self._bridge.preview.emit(small, sample)
                 next_t = max(next_t + 1.0 / max(self.fps, 0.1), time.perf_counter() - 0.5)
                 stop.wait(max(0.0, next_t - time.perf_counter()))
         except Exception as e:  # reported to the main thread, which restarts us (spec §12.1)

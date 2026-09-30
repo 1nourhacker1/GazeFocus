@@ -39,8 +39,10 @@ class CameraCfg:
 
 @dataclass(frozen=True)
 class DockCfg:
+    enabled: bool = True
     monitor: str = "primary"
-    scale: float = 1.75
+    scale: float = 2.625  # 1.75 x 1.5: a 115.5 x 52.5 pill (the user asked for 1.5x, 2026-09-30)
+    refraction: bool = True  # the lens rim (M0-C2)
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,10 @@ def _num(lo: float, hi: float, lo_open: bool = False, desc: str | None = None):
     return ok, desc or f"a number {lo}..{hi}"
 
 
+def _bool():
+    return (lambda v: isinstance(v, bool)), "true or false"
+
+
 def _text():
     return (lambda v: isinstance(v, str) and v.strip() != ""), "a non-empty string"
 
@@ -93,7 +99,7 @@ RULES = {
         "idle_after_s": _int(0, 86_400),
         "battery_fps": _int(1, 60),
     },
-    "dock": {"monitor": _text(), "scale": _num(0.5, 4.0)},
+    "dock": {"enabled": _bool(), "monitor": _text(), "scale": _num(0.5, 4.0), "refraction": _bool()},
     "hotkey": {"pause": _text()},
 }
 
@@ -136,6 +142,8 @@ def load_config(path: Path) -> tuple[Config, list[str]]:
 
 
 def _fmt(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"  # TOML booleans are lower-case
     return f'"{v}"' if isinstance(v, str) else repr(v)
 
 

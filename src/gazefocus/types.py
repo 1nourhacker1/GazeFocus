@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Literal
 
@@ -23,6 +23,16 @@ class HeadSample:
     pitch: float = 0.0
     iris_h: float = 0.0
     iris_v: float = 0.0
+    box: tuple[float, float, float, float] | None = None  # face bounds in 0..1 camera coords: the dock's preview only
+    nose: tuple[float, float] | None = None
+
+
+def recordable(sample: HeadSample) -> dict:
+    """What recordings and saved calibration samples keep: head angles and timings, never face positions."""
+    d = asdict(sample)
+    d.pop("box", None)
+    d.pop("nose", None)
+    return d
 
 
 Action = Literal["none", "switch", "blocked"]

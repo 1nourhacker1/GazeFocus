@@ -72,3 +72,24 @@ def test_unreadable_config_gives_defaults(tmp_path):
     folder.mkdir()  # reading a directory raises OSError
     cfg, warns = load_config(folder)
     assert cfg == Config() and len(warns) == 1 and "could not read" in warns[0]
+
+
+def test_dock_defaults_are_the_bigger_pill_with_the_lens():
+    d = Config().dock
+    assert (d.enabled, d.monitor, d.scale, d.refraction) == (True, "primary", 2.625, True)
+
+
+def test_booleans_are_written_as_toml_booleans(tmp_path):
+    text = default_toml()
+    assert "enabled = true" in text and "refraction = true" in text and "scale = 2.625" in text
+    p = tmp_path / "config.toml"
+    p.write_text(text.replace("refraction = true", "refraction = false"), encoding="utf-8")
+    cfg, warns = load_config(p)
+    assert cfg.dock.refraction is False and warns == []
+
+
+def test_a_non_boolean_dock_switch_falls_back_with_a_warning(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[dock]\nenabled = "yes"\n', encoding="utf-8")
+    cfg, warns = load_config(p)
+    assert cfg.dock.enabled is True and any("true or false" in w for w in warns)
