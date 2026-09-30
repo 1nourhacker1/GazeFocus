@@ -74,3 +74,4 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [Plan 3 acceptance](spikes/plan3-acceptance.md)
 - [gazefocus/calib/path.py](reference/gazefocus/calib/path.md)
 - [gazefocus/calib/session.py](reference/gazefocus/calib/session.md)
+- [gazefocus/calib/overlay.py](reference/gazefocus/calib/overlay.md)
