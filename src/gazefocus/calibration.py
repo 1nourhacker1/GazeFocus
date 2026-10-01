@@ -14,7 +14,7 @@ from typing import Sequence
 
 from gazefocus.logic.classifier import ZoneModel, quality
 from gazefocus.storage import Calibration, calibration_path, now_iso, save_calibration
-from gazefocus.types import HeadSample, recordable
+from gazefocus.types import LEGACY_NAMES, HeadSample, recordable
 from gazefocus.win.monitors import MonitorInfo, layout_fingerprint, zone_monitors
 
 SAMPLES_FILE = "calibration-samples.jsonl"
@@ -40,7 +40,8 @@ def load_samples(path: Path) -> dict[str, list[HeadSample]]:
         for line in f:
             if line.strip():
                 d = json.loads(line)
-                out.setdefault(d.pop("screen"), []).append(HeadSample(**d))
+                screen = d.pop("screen")
+                out.setdefault(LEGACY_NAMES.get(screen, screen), []).append(HeadSample(**d))
     return out
 
 

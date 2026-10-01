@@ -81,3 +81,9 @@ def test_recordings_never_hold_face_positions(tmp_path):
     assert "box" not in text and "nose" not in text and "-20.0" in text
     (read_back, _), = read_recording(p)
     assert read_back.yaw == -20.0 and read_back.box is None
+
+
+def test_recordings_made_before_the_rename_still_replay():
+    from gazefocus.types import Zone
+
+    assert Zone("LG") is Zone.EXTERNAL

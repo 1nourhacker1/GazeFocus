@@ -93,3 +93,10 @@ def test_a_non_boolean_dock_switch_falls_back_with_a_warning(tmp_path):
     p.write_text('[dock]\nenabled = "yes"\n', encoding="utf-8")
     cfg, warns = load_config(p)
     assert cfg.dock.enabled is True and any("true or false" in w for w in warns)
+
+
+def test_the_old_name_of_the_face_lost_margin_still_works(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text("[classifier]\nface_lost_lg_margin = -2.0\n", encoding="utf-8")
+    cfg, warnings = load_config(p)
+    assert warnings == [] and cfg.classifier.face_lost_external_margin == -2.0

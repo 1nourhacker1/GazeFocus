@@ -93,3 +93,18 @@ def test_version_1_file_is_rejected(tmp_path):
     p.write_text(json.dumps(d), encoding="utf-8")
     c, warn = load_calibration(p)
     assert c is None and "version 1" in warn and "recalibrate" in warn
+
+
+def test_a_file_saved_before_the_rename_still_loads(tmp_path):
+    """Calibrations written while the external monitor was called "LG" (Plans 1-4)."""
+    p = tmp_path / "calibration.json"
+    save_calibration(cal(), p)
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d["zone_monitors"] = {"LAPTOP": "id-lap", "LG": "id-ext"}
+    d["samples"] = {"LG": 72, "LAPTOP": 75}
+    d["model"]["mean_lg"] = d["model"].pop("mean_external")
+    p.write_text(json.dumps(d), encoding="utf-8")
+    loaded, warning = load_calibration(p)
+    assert warning is None
+    assert loaded.zone_monitors == {"LAPTOP": "id-lap", "EXTERNAL": "id-ext"}
+    assert loaded.samples == {"EXTERNAL": 72, "LAPTOP": 75} and loaded.model.mean_external == (32, 7, 0.2)

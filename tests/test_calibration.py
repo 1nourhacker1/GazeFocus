@@ -58,3 +58,9 @@ def test_saved_samples_never_hold_face_positions(tmp_path):
     save_samples(p, {"EXTERNAL": [HeadSample(t=1.0, face=True, yaw=30.0, box=(0.1, 0.2, 0.3, 0.4), nose=(0.2, 0.3))]})
     assert "box" not in p.read_text(encoding="utf-8")
     assert load_samples(p)["EXTERNAL"][0].yaw == 30.0
+
+
+def test_samples_saved_before_the_rename_still_load(tmp_path):
+    p = tmp_path / SAMPLES_FILE
+    p.write_text('{"screen": "LG", "t": 1.0, "face": true, "yaw": 30.0}\n', encoding="utf-8")
+    assert load_samples(p)["EXTERNAL"][0].yaw == 30.0

@@ -7,10 +7,17 @@ from enum import Enum
 from typing import Literal
 
 
+LEGACY_NAMES = {"LG": "EXTERNAL"}  # the external monitor was called "LG" in files written before the rename
+
+
 class Zone(Enum):
     LAPTOP = "LAPTOP"
     EXTERNAL = "EXTERNAL"
     UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls(LEGACY_NAMES[value]) if value in LEGACY_NAMES else None  # old recordings still replay
 
 
 @dataclass(frozen=True)

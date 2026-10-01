@@ -10,6 +10,7 @@ from pathlib import Path
 
 from gazefocus.logic.classifier import FEATURES, ZoneModel
 from gazefocus.paths import app_dir
+from gazefocus.types import LEGACY_NAMES
 from gazefocus.win.monitors import MonitorInfo
 
 VERSION = 2  # v2 (2026-09-29): 3 features + per-feature sd; v1 files must be recalibrated
@@ -51,11 +52,22 @@ def save_calibration(cal: Calibration, path: Path) -> None:
     tmp.replace(path)
 
 
+def _upgrade_names(d: dict) -> dict:
+    """A file from before the rename: "LG" keys become "EXTERNAL", the model's mean_lg becomes mean_external."""
+    for part in ("zone_monitors", "samples"):
+        if isinstance(d.get(part), dict):
+            d[part] = {LEGACY_NAMES.get(k, k): v for k, v in d[part].items()}
+    model = d.get("model")
+    if isinstance(model, dict) and "mean_lg" in model:
+        model["mean_external"] = model.pop("mean_lg")
+    return d
+
+
 def load_calibration(path: Path) -> tuple[Calibration | None, str | None]:
     if not path.exists():
         return None, None
     try:
-        d = json.loads(path.read_text(encoding="utf-8"))
+        d = _upgrade_names(json.loads(path.read_text(encoding="utf-8")))
         if d.get("version") != VERSION:
             return None, f"calibration.json version {d.get('version')!r} is not supported; please recalibrate"
         monitors = tuple(

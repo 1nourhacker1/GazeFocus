@@ -104,6 +104,9 @@ RULES = {
 }
 
 
+RENAMED = {("classifier", "face_lost_lg_margin"): "face_lost_external_margin"}  # old names still accepted
+
+
 def load_config(path: Path) -> tuple[Config, list[str]]:
     """Never raises on bad content: invalid parts fall back to defaults with a warning."""
     if not path.exists():
@@ -127,6 +130,7 @@ def load_config(path: Path) -> tuple[Config, list[str]]:
         current = getattr(cfg, section)
         updates = {}
         for key, value in table.items():
+            key = RENAMED.get((section, key), key)
             rule = RULES[section].get(key)
             if rule is None:
                 warns.append(f"unknown key [{section}].{key} (ignored)")
