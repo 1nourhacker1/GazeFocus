@@ -140,6 +140,9 @@ def test_diag_windows_survives_unicode_titles_on_a_cp1252_console(monkeypatch): 
 
 
 def test_diag_focus_with_no_window_on_that_screen(monkeypatch, capsys):
+    two = [MonitorInfo(r"\\.\FAKE1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True),
+           MonitorInfo(r"\\.\FAKE5", "id-ext", (-1920, -302, 0, 778), (-1920, -302, 0, 738), False)]
+    monkeypatch.setattr("gazefocus.win.monitors.enumerate_monitors", lambda: two)  # CI machines have one screen
     monkeypatch.setattr(win_windows, "choose_target", lambda *a, **k: None)
     assert main(["diag", "focus", "EXTERNAL", "--delay", "0"]) == 1
     assert "no window" in capsys.readouterr().out
