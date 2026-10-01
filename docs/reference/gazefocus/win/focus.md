@@ -9,4 +9,4 @@ Verified against: GazeFocus@0b9e2a5 · 2026-09-29
 5. Otherwise `failed`: "refused (elevated window or focus lock)" or "fallback timed out (hung window?)". The caller logs one FAIL and **doesn't retry**. M0-B (2026-09-30): elevated windows actually succeed via `direct`, so in practice a refusal means a focus lock.
 
 Cursor helpers: `cursor_pos`, `warp_cursor` (`SetCursorPos`, physical pixels under per-monitor DPI v2), `window_center` and `clamp_point(p, work_rect)`.
-M0-B results: `docs/spikes/m0b-focus-switch.md`.
+M0-B results: the M0 spike notes (not published).

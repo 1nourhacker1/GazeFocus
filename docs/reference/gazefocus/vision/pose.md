@@ -11,4 +11,4 @@ Pure geometry, no MediaPipe import.
   - Vertical: the iris position between the lids.
   - A span under 1e-4 (a blink) gives 0 for that axis, so it's never NaN.
 - Landmark indices: right eye `33, 133, 159, 145, iris 468`; left eye `362, 263, 386, 374, iris 473`.
-- The yaw sign's physical meaning is recorded in `docs/spikes/m0a-tracking.md`.
+- The yaw sign's physical meaning is recorded in the M0 spike notes (not published).

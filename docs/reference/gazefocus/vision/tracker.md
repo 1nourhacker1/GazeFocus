@@ -7,6 +7,6 @@ Verified against: GazeFocus@b887938 · 2026-10-01
 - `detect(bgr, t)`: BGR→RGB, `mp.Image(SRGB)`, then `detect_for_video(image, ms)`, returning the **raw** result (landmarks + matrices), used by the live view.
 - `process(bgr, t)`: `detect()` → `HeadSample` via `sample_from_result`.
 - `next_timestamp_ms` keeps timestamps strictly increasing, because VIDEO mode rejects repeats or decreases.
-- M0-A results: yaw **positive** toward the external monitor, face tracked 100 % up to +62°, 6–7 ms per frame. See `docs/spikes/m0a-tracking.md`.
+- M0-A results: yaw **positive** toward the external monitor, face tracked 100 % up to +62°, 6–7 ms per frame. See the spike notes (not published).
 - A missing model raises `FileNotFoundError` naming `scripts/fetch_model.py`.
 - `sample_from_result` also fills `box` (the landmarks' bounds) and `nose` (landmark 1).

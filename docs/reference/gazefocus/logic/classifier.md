@@ -11,7 +11,7 @@ Verified against: GazeFocus@b887938 · 2026-10-01
 5. `separation` = the diagonal Mahalanobis distance between the means. Identical means raise `ValueError` ("indistinguishable").
 6. The model also stores the pooled `sd` per feature. `quality()`: ≥ 4 is excellent, ≥ 2 is good, anything lower is too close.
 
-**Why diagonal:** the first real calibration (2026-09-29) fitted with full-covariance LDA gave `pitch` a weight of −0.378, the *opposite* sign to its mean difference. It was exploiting the correlation between pitch and eyelid position. Looking down at the laptop then read as external monitor, and a head at +41° read as LAPTOP. See `docs/spikes/plan1-desk-session.md`.
+**Why diagonal:** the first real calibration (2026-09-29) fitted with full-covariance LDA gave `pitch` a weight of −0.378, the *opposite* sign to its mean difference. It was exploiting the correlation between pitch and eyelid position. Looking down at the laptop then read as external monitor, and a head at +41° read as LAPTOP. See the spike notes (not published).
 
 **Per frame** (`ZoneClassifier.update`):
 - **Face present:**

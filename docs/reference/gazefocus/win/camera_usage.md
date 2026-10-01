@@ -6,5 +6,5 @@ Reads `HKCU\…\CapabilityAccessManager\ConsentStore\webcam`.
 - An app counts as "using" the camera when `LastUsedTimeStart > 0` and `LastUsedTimeStop == 0`.
 - **Only a hint.** Records go stale when an app crashes, so it's consulted only after `CameraSource.open()` fails, and the message says "Possibly".
 - `exclude=` drops our own interpreter paths, so a stale record from our own crash isn't reported.
-- M0-D results: `docs/spikes/m0d-camera-sharing.md`.
+- M0-D results: the M0 spike notes (not published).
 - Unreadable subkeys are skipped. The 'nobody reported' message suggests another GazeFocus command may hold the camera.

@@ -1,7 +1,7 @@
 # GazeFocus docs
 
 Webcam "focus follows gaze" for a two-monitor Windows setup, with a Liquid Glass status dock under the laptop camera.
-This root index is hand-written. Sub-indexes appear once `reference/` exists.
+This root index is hand-written. The hardware spike notes and build plans behind the design are not published; their results are summarised in the spec and the reference docs.
 
 ## Trust table
 
@@ -10,7 +10,6 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 | `superpowers/specs/` | Design. §9 is implemented and accepted at the desk (Plan 4, 2026-09-30; §9 item 9 records it as built, §15 amended). §8 is implemented (Plan 3; §8.2, §8.4, §8.5 and §15 amended). §8 amended with the M0-C2 result, and §7.3 and §12 with M0-B (2026-09-30). §6, §7.4, §8.5, §10 and §15 were amended after Plan 1; §5, §7.1, §7.4, §12.3 and §15 again after Plan 2, and the header, §4.5, §9 and §15 after its final review (2026-09-29). §4 and §7 are implemented, unit-tested and accepted at the desk (2026-09-30); §8 (the dock) was accepted at the desk on 2026-09-30 | — |
 | `superpowers/mockups/` | Approved interactive mockups; the reference for visuals and timings | — |
 | `reference/gazefocus/` | Code-verified per file (see each `Verified against`) | per file |
-| `spikes/` | Hardware spike results, pasted from real runs | per file |
 
 ## Contents
 
@@ -27,13 +26,9 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/vision/pose.py](reference/gazefocus/vision/pose.md)
 - [gazefocus/vision/camera.py](reference/gazefocus/vision/camera.md)
 - [gazefocus/win/camera_usage.py](reference/gazefocus/win/camera_usage.md)
-- [M0-D: camera sharing](spikes/m0d-camera-sharing.md)
 - [gazefocus/vision/tracker.py](reference/gazefocus/vision/tracker.md)
 - [gazefocus/probe.py](reference/gazefocus/probe.md)
 - [gazefocus/viewer.py](reference/gazefocus/viewer.md)
-- [M0-A: tracking](spikes/m0a-tracking.md)
-- [M0-C: glass pill dock](spikes/m0c-glass-dock.md)
-- [M0-C2: self-rendered Liquid Glass dock](spikes/m0c2-liquid-glass.md)
 - [gazefocus/config.py](reference/gazefocus/config.md)
 - [gazefocus/logic/classifier.py](reference/gazefocus/logic/classifier.md)
 - [gazefocus/logic/decider.py](reference/gazefocus/logic/decider.md)
@@ -42,12 +37,10 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/replay.py](reference/gazefocus/replay.md)
 - [gazefocus/runtime.py](reference/gazefocus/runtime.md)
 - [gazefocus/__main__.py](reference/gazefocus/__main__.md)
-- [Plan 1 desk session](spikes/plan1-desk-session.md)
 - [gazefocus/win/_api.py](reference/gazefocus/win/_api.md)
 - [gazefocus/win/msgwindow.py](reference/gazefocus/win/msgwindow.md)
 - [gazefocus/win/windows.py](reference/gazefocus/win/windows.md)
 - [gazefocus/win/focus.py](reference/gazefocus/win/focus.md)
-- [M0-B: focus switch](spikes/m0b-focus-switch.md)
 - [gazefocus/win/rawinput.py](reference/gazefocus/win/rawinput.md)
 - [gazefocus/win/foreground.py](reference/gazefocus/win/foreground.md)
 - [gazefocus/win/system.py](reference/gazefocus/win/system.md)
@@ -59,7 +52,6 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/app/workers.py](reference/gazefocus/app/workers.md)
 - [gazefocus/app/tray.py](reference/gazefocus/app/tray.md)
 - [gazefocus/app/main.py](reference/gazefocus/app/main.md)
-- [Plan 2 acceptance](spikes/plan2-acceptance.md)
 - [gazefocus/dock/motion.py](reference/gazefocus/dock/motion.md)
 - [gazefocus/dock/view.py](reference/gazefocus/dock/view.md)
 - [gazefocus/dock/scene.py](reference/gazefocus/dock/scene.md)
@@ -71,10 +63,8 @@ This root index is hand-written. Sub-indexes appear once `reference/` exists.
 - [gazefocus/dock/ticker.py](reference/gazefocus/dock/ticker.md)
 - [gazefocus/dock/window.py](reference/gazefocus/dock/window.md)
 - [gazefocus/dock/demo.py](reference/gazefocus/dock/demo.md)
-- [Plan 3 acceptance](spikes/plan3-acceptance.md)
 - [gazefocus/calib/path.py](reference/gazefocus/calib/path.md)
 - [gazefocus/calib/session.py](reference/gazefocus/calib/session.md)
 - [gazefocus/calib/overlay.py](reference/gazefocus/calib/overlay.md)
 - [gazefocus/dock/modal.py](reference/gazefocus/dock/modal.md)
 - [gazefocus/calib/run.py](reference/gazefocus/calib/run.md)
-- [Plan 4 acceptance](spikes/plan4-acceptance.md)

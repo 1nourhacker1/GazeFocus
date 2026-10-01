@@ -166,7 +166,7 @@ class Decision:
 
 ## 6. Signal processing
 
-> **Revised 2026-09-29 (Plan 1 desk session).** The first real calibration showed that the full-covariance, four-feature LDA originally written here weighted pitch *against* its own mean difference, by exploiting the pitch↔eyelid correlation. Looking down at the laptop then read as the LG. What follows is the design that replaced it; the evidence is in `docs/spikes/plan1-desk-session.md`.
+> **Revised 2026-09-29 (Plan 1 desk session).** The first real calibration showed that the full-covariance, four-feature LDA originally written here weighted pitch *against* its own mean difference, by exploiting the pitch↔eyelid correlation. Looking down at the laptop then read as the LG. What follows is the design that replaced it; the evidence is in the M0 spike notes (not published).
 
 ### 6.1 Features
 - From MediaPipe (`num_faces=1`, facial transformation matrices on, blendshapes off, confidence thresholds 0.5):
@@ -227,7 +227,7 @@ class Decision:
   **M0-D result (2026-09-29):**
   - The webcam is **exclusive**. The Windows Camera app fails while GazeFocus holds it.
   - A failed attempt by another app leaves **no** ConsentStore trace, so this check only covers the reverse case.
-  - Plan 2 must hand the camera over explicitly: the manual pause, and possibly a call-app heuristic. See `docs/spikes/m0d-camera-sharing.md`.
+  - Plan 2 must hand the camera over explicitly: the manual pause, and possibly a call-app heuristic. See the M0 spike notes (not published).
   **Decision (2026-09-29):** camera hand-over is **manual only**. Ctrl+Alt+G or tray → Pause releases the camera. The user declined auto-yielding to call apps, and declined Windows' "allow multiple apps to use the camera" setting.
 - **Single instance:** named mutex `Local\GazeFocus`. A second launch exits.
 
@@ -301,7 +301,7 @@ class Decision:
   - No grabs run while something moves.
 - **Expanding:** the window is sized to the panel's maximum, and the pill is drawn inside it.
 - **Hidden** while locked, asleep, or while a fullscreen app (not a maximized window) covers the laptop screen (Plan 3).
-- See `docs/spikes/m0c-glass-dock.md` and `docs/spikes/m0c2-liquid-glass.md`.
+- See the M0 spike notes (not published).
 - **CPU cost:**
   - When idle, there are zero frames. There's only a 4–6 ms screen grab about 7 times a second, to notice changes behind the dock.
   - An animation costs 2–5 ms a frame, for half a second.
