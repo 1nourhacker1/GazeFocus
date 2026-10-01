@@ -9,7 +9,7 @@ from typing import Literal
 
 class Zone(Enum):
     LAPTOP = "LAPTOP"
-    LG = "LG"
+    EXTERNAL = "EXTERNAL"
     UNKNOWN = "UNKNOWN"
 
 

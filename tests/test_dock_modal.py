@@ -19,12 +19,12 @@ from gazefocus.types import HeadSample
 LEFT, TOP = 10.0, 6.0
 
 
-def result(lg_yaw=30.0, lap_yaw=0.0, *, title="Calibrated ✓", q="excellent"):
+def result(external_yaw=30.0, lap_yaw=0.0, *, title="Calibrated ✓", q="excellent"):
     rng = random.Random(3)
-    lg = [HeadSample(i, True, lg_yaw + rng.gauss(0, 2), rng.gauss(-3, 2), 0.0) for i in range(60)]
+    ext = [HeadSample(i, True, external_yaw + rng.gauss(0, 2), rng.gauss(-3, 2), 0.0) for i in range(60)]
     lap = [HeadSample(i, True, lap_yaw + rng.gauss(0, 2), rng.gauss(-8, 2), 0.0) for i in range(60)]
-    model = fit_zone_model(lg, lap)
-    return CalibrationResult(model, {"LG": lg, "LAPTOP": lap}, {"LG": 60, "LAPTOP": 60}, q, title,
+    model = fit_zone_model(ext, lap)
+    return CalibrationResult(model, {"EXTERNAL": ext, "LAPTOP": lap}, {"EXTERNAL": 60, "LAPTOP": 60}, q, title,
                              "Look at each screen: the water should follow.")
 
 
@@ -52,7 +52,7 @@ def test_a_result_that_can_be_saved_offers_save_and_redo():
 
 
 def test_a_result_that_cannot_be_saved_offers_only_redo():
-    bad = CalibrationResult(None, {}, {"LG": 3, "LAPTOP": 70}, None, "Too few samples", "Is the room too dark?")
+    bad = CalibrationResult(None, {}, {"EXTERNAL": 3, "LAPTOP": 70}, None, "Too few samples", "Is the room too dark?")
     assert set(result_buttons(False)) == {"redo"}
     save = result_buttons(True)["save"].center()
     hit = modal_button_at("result", LEFT + save.x(), TOP + save.y(), LEFT, TOP, bad)
@@ -65,14 +65,14 @@ def test_degrees_are_signed_like_the_mockup():
     assert (fmt_deg(29.3), fmt_deg(-3.6), fmt_deg(0.0)) == ("+29°", "−4°", "0°")
 
 
-def test_the_plot_puts_the_lg_on_the_left_and_every_sample_inside():
-    for lg_yaw, lap_yaw in ((30.0, 0.0), (-34.0, -3.0)):  # the LG's yaw can have either sign
-        r = result(lg_yaw, lap_yaw)
+def test_the_plot_puts_the_external_on_the_left_and_every_sample_inside():
+    for external_yaw, lap_yaw in ((30.0, 0.0), (-34.0, -3.0)):  # the external monitor's yaw can have either sign
+        r = result(external_yaw, lap_yaw)
         to_xy = plot_map(r)
-        lg_x = [to_xy(s.yaw, s.pitch)[0] for s in r.samples["LG"]]
+        external_x = [to_xy(s.yaw, s.pitch)[0] for s in r.samples["EXTERNAL"]]
         lap_x = [to_xy(s.yaw, s.pitch)[0] for s in r.samples["LAPTOP"]]
-        assert sum(lg_x) / 60 < sum(lap_x) / 60
-        for s in r.samples["LG"] + r.samples["LAPTOP"]:
+        assert sum(external_x) / 60 < sum(lap_x) / 60
+        for s in r.samples["EXTERNAL"] + r.samples["LAPTOP"]:
             x, y = to_xy(s.yaw, s.pitch)
             assert 4 <= x <= SCATTER.width() - 4 and 4 <= y <= SCATTER.height() - 4
 
@@ -95,7 +95,7 @@ def test_the_scatter_shows_each_screen_in_its_colour(qapp):
                 blue += x < SCATTER.width() / 2
             if c.red() > 150 and c.blue() > 200 and c.green() < 120 and c.alpha() > 100:
                 purple += x >= SCATTER.width() / 2
-    assert blue > 20 and purple > 20  # the LG's blue points on the left, the laptop's purple on the right
+    assert blue > 20 and purple > 20  # the external monitor's blue points on the left, the laptop's purple on the right
 
 
 def test_a_transparent_modal_panel_draws_nothing(qapp):

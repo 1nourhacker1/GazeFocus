@@ -26,7 +26,7 @@ PRIMARY = {"start", "save"}
 BLUE = QColor(10, 132, 255)  # #0a84ff
 SCATTER = QRectF(16, 24, 160, 110)
 COL_X, COL_W = 188.0, 168.0  # the result's text column
-LG_BLUE, LAPTOP_PURPLE = QColor(10, 132, 255), QColor(191, 90, 242)  # #0a84ff, #bf5af2
+EXTERNAL_BLUE, LAPTOP_PURPLE = QColor(10, 132, 255), QColor(191, 90, 242)  # #0a84ff, #bf5af2
 METER_GREEN = QColor(40, 167, 69)  # #28a745
 PLOT_PAD = 8.0  # the plot area inside the scatter's rounded rect (the mockup's 8..152 x 8..102)
 PARA = {False: QColor(60, 60, 67, 204), True: QColor(235, 235, 245, 179)}  # rgba(60,60,67,.8)
@@ -56,14 +56,14 @@ def fmt_deg(v: float) -> str:
 
 
 def plot_map(result: "CalibrationResult") -> Callable[[float, float], tuple[float, float]]:
-    """(yaw, pitch) -> a point in the scatter (relative to its top-left). Yaw runs so that the LG is on
+    """(yaw, pitch) -> a point in the scatter (relative to its top-left). Yaw runs so that the external monitor is on
     the left, whatever the sign of its yaw; pitch up is up. Both axes fit the samples, with a margin."""
-    lg, lap = result.samples.get("LG", []), result.samples.get("LAPTOP", [])
+    ext, lap = result.samples.get("EXTERNAL", []), result.samples.get("LAPTOP", [])
     sign = 1.0
-    if lg and lap and sum(s.yaw for s in lg) / len(lg) > sum(s.yaw for s in lap) / len(lap):
+    if ext and lap and sum(s.yaw for s in ext) / len(ext) > sum(s.yaw for s in lap) / len(lap):
         sign = -1.0
-    xs = [sign * s.yaw for s in lg + lap] or [-10.0, 10.0]
-    ys = [s.pitch for s in lg + lap] or [-10.0, 10.0]
+    xs = [sign * s.yaw for s in ext + lap] or [-10.0, 10.0]
+    ys = [s.pitch for s in ext + lap] or [-10.0, 10.0]
 
     def span(vals: list[float]) -> tuple[float, float]:
         lo, hi = min(vals), max(vals)
@@ -134,7 +134,7 @@ def _draw_scatter(p: QPainter, result: "CalibrationResult", dark: bool) -> None:
     m = result.model
     if m is not None:  # the model's own boundary (margin 0) at the screens' mean iris position
         w0, w1, w2 = m.w
-        c = -(m.b + w2 * (m.mean_lg[2] + m.mean_laptop[2]) / 2)
+        c = -(m.b + w2 * (m.mean_external[2] + m.mean_laptop[2]) / 2)
         n2 = w0 * w0 + w1 * w1
         if n2 > 1e-12:
             px, py = c * w0 / n2, c * w1 / n2  # the line's point nearest the origin, in (yaw, pitch)
@@ -145,7 +145,7 @@ def _draw_scatter(p: QPainter, result: "CalibrationResult", dark: bool) -> None:
             p.setPen(pen)
             p.drawLine(QPointF(*a), QPointF(*b))
     p.setPen(Qt.NoPen)
-    for key, colour in (("LG", LG_BLUE), ("LAPTOP", LAPTOP_PURPLE)):
+    for key, colour in (("EXTERNAL", EXTERNAL_BLUE), ("LAPTOP", LAPTOP_PURPLE)):
         c = QColor(colour)
         c.setAlphaF(0.75)
         p.setBrush(c)
@@ -156,11 +156,11 @@ def _draw_scatter(p: QPainter, result: "CalibrationResult", dark: bool) -> None:
         f = _font(8, QFont.DemiBold)
         p.setFont(f)
         fm = QFontMetricsF(f)
-        lx, ly = to_xy(m.mean_lg[0], m.mean_lg[1])
+        lx, ly = to_xy(m.mean_external[0], m.mean_external[1])
         rx, ry = to_xy(m.mean_laptop[0], m.mean_laptop[1])
-        lx = max(4.0, lx - 18 - fm.horizontalAdvance("LG"))
+        lx = max(4.0, lx - 18 - fm.horizontalAdvance("EXTERNAL"))
         rx = min(box.width() - 4 - fm.horizontalAdvance("Laptop"), rx + 18)
-        p.drawText(QPointF(lx, ly + 3), "LG")
+        p.drawText(QPointF(lx, ly + 3), "EXTERNAL")
         p.drawText(QPointF(rx, ry + 3), "Laptop")
     p.restore()
 
@@ -177,7 +177,7 @@ def draw_result(p: QPainter, left: float, top: float, result: "CalibrationResult
     if result.can_save:
         p.setPen(HINT[dark])
         p.setFont(_font(10.5, family="Cascadia Mono"))
-        stats = (f"yaw / pitch\nLG     {fmt_deg(m.mean_lg[0])} / {fmt_deg(m.mean_lg[1])}\n"
+        stats = (f"yaw / pitch\nLG     {fmt_deg(m.mean_external[0])} / {fmt_deg(m.mean_external[1])}\n"
                  f"Laptop {fmt_deg(m.mean_laptop[0])} / {fmt_deg(m.mean_laptop[1])}")
         p.drawText(QRectF(x, 46, COL_W, 50), Qt.AlignLeft | Qt.AlignTop, stats)
     else:

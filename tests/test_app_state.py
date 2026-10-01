@@ -84,7 +84,7 @@ def logger_with_list():
     return log, h
 
 
-def d(action, reason, zone=Zone.LG, target=Zone.LG, margin=-0.8):
+def d(action, reason, zone=Zone.EXTERNAL, target=Zone.EXTERNAL, margin=-0.8):
     return Decision(t=0.0, zone=zone, margin=margin, action=action, reason=reason, target=target)
 
 
@@ -97,19 +97,19 @@ def test_decision_logger_collapses_blocked_runs_and_skips_none():
     dl.decision(d("blocked", "typing 0.1s"))
     dl.decision(d("switch", "dwell met"))
     assert h.lines == [
-        "zone=LG margin=-0.80 -> BLOCKED(typing 0.2s)",
-        "zone=LG margin=-0.80 -> BLOCKED(typing 0.1s)",
-        "zone=LG margin=-0.80 -> SWITCH LG",
+        "zone=EXTERNAL margin=-0.80 -> BLOCKED(typing 0.2s)",
+        "zone=EXTERNAL margin=-0.80 -> BLOCKED(typing 0.1s)",
+        "zone=EXTERNAL margin=-0.80 -> SWITCH EXTERNAL",
     ]
 
 
 def test_outcomes_are_logged_with_titles():
     log, h = logger_with_list()
     dl = DecisionLogger(log)
-    dl.outcome("LG", "Notepad", SwitchResult(True, "direct", 12.0))
-    dl.outcome("LG", "Task Manager", SwitchResult(False, "failed", 520.0, "refused (elevated window or focus lock)"))
-    assert h.lines[0] == "   focused 'Notepad' on LG via direct in 12 ms"
-    assert h.lines[1].startswith("   FAIL 'Task Manager' on LG: refused")
+    dl.outcome("EXTERNAL", "Notepad", SwitchResult(True, "direct", 12.0))
+    dl.outcome("EXTERNAL", "Task Manager", SwitchResult(False, "failed", 520.0, "refused (elevated window or focus lock)"))
+    assert h.lines[0] == "   focused 'Notepad' on EXTERNAL via direct in 12 ms"
+    assert h.lines[1].startswith("   FAIL 'Task Manager' on EXTERNAL: refused")
 
 
 def test_setup_logging_writes_both_files(tmp_path):

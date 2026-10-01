@@ -12,14 +12,14 @@ from gazefocus.win.focus import SwitchResult
 from gazefocus.win.foreground import MruTracker
 from gazefocus.win.rawinput import InputTracker, RawEvent
 
-LG_DEV, LAP_DEV = r"\\.\DISPLAY5", r"\\.\DISPLAY1"
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 10, 0), mean_laptop=(0, 10, 0), sd=(10.0, 5.0, 0.1))
-AREAS = {LG_DEV: (-1920, -302, 0, 778), LAP_DEV: (0, 0, 2560, 1600)}
+EXTERNAL_DEV, LAP_DEV = r"\\.\DISPLAY5", r"\\.\DISPLAY1"
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_external=(-30, 10, 0), mean_laptop=(0, 10, 0), sd=(10.0, 5.0, 0.1))
+AREAS = {EXTERNAL_DEV: (-1920, -302, 0, 778), LAP_DEV: (0, 0, 2560, 1600)}
 
 
 class FakeDesktop:
     def __init__(self):
-        self.windows = {1: LAP_DEV, 2: LAP_DEV, 11: LG_DEV, 12: LG_DEV}
+        self.windows = {1: LAP_DEV, 2: LAP_DEV, 11: EXTERNAL_DEV, 12: EXTERNAL_DEV}
         self.fg = 1
         self.buttons = False
         self.full = False
@@ -27,7 +27,7 @@ class FakeDesktop:
         self.brought = []
         self.cursor = (500, 500)
         self.warped = []
-        self.lg_windows = [11, 12]
+        self.external_windows = [11, 12]
 
     def desktop(self):
         return Desktop(
@@ -39,15 +39,15 @@ class FakeDesktop:
             bring_to_front=self.bring,
             title_of=lambda h: f"window {h}",
             cursor_pos=lambda: self.cursor,
-            device_of_point=lambda x, y: LG_DEV if x < 0 else LAP_DEV,
+            device_of_point=lambda x, y: EXTERNAL_DEV if x < 0 else LAP_DEV,
             warp_cursor=lambda p: self.warped.append(p) or True,
-            window_center=lambda h: (-960, 238) if self.windows.get(h) == LG_DEV else (1280, 800),
+            window_center=lambda h: (-960, 238) if self.windows.get(h) == EXTERNAL_DEV else (1280, 800),
             work_area=AREAS.get,
         )
 
     def choose(self, device, mru):
         pool = [h for h in mru if self.windows.get(h) == device] or [
-            h for h, d in self.windows.items() if d == device and (d != LG_DEV or h in self.lg_windows)
+            h for h, d in self.windows.items() if d == device and (d != EXTERNAL_DEV or h in self.external_windows)
         ]
         return pool[0] if pool else None
 
@@ -86,7 +86,7 @@ class Rig:
             input_tracker=self.input,
             mru=self.mru,
             desktop=self.fake.desktop(),
-            zone_devices=zone_devices or {Zone.LAPTOP: LAP_DEV, Zone.LG: LG_DEV},
+            zone_devices=zone_devices or {Zone.LAPTOP: LAP_DEV, Zone.EXTERNAL: EXTERNAL_DEV},
             cursor_idle_warp_ms=2000,
             log=DecisionLogger(logger),
             clock=lambda: self.now,
@@ -102,24 +102,24 @@ class Rig:
         return out
 
 
-LG_YAW, LAP_YAW = -30.0, 0.0
+EXTERNAL_YAW, LAP_YAW = -30.0, 0.0
 
 
-def test_looking_at_the_lg_focuses_its_most_recent_window():
+def test_looking_at_the_external_focuses_its_most_recent_window():
     r = Rig()
-    r.mru.on_foreground(50.0, 12, LG_DEV)
-    r.mru.on_foreground(51.0, 11, LG_DEV)  # 11 is the most recent LG window
+    r.mru.on_foreground(50.0, 12, EXTERNAL_DEV)
+    r.mru.on_foreground(51.0, 11, EXTERNAL_DEV)  # 11 is the most recent EXTERNAL window
     r.look(1.0, LAP_YAW)
-    out = r.look(1.5, LG_YAW)
+    out = r.look(1.5, EXTERNAL_YAW)
     assert r.fake.brought == [11] and r.fake.fg == 11
     assert out[-1].reason == "on target"
-    assert any(l.startswith("zone=LG") and "SWITCH LG" in l for l in r.lines.lines)
-    assert any("focused 'window 11' on LG via direct" in l for l in r.lines.lines)
+    assert any(l.startswith("zone=EXTERNAL") and "SWITCH EXTERNAL" in l for l in r.lines.lines)
+    assert any("focused 'window 11' on EXTERNAL via direct" in l for l in r.lines.lines)
 
 
 def test_looking_back_returns_to_the_laptop():
     r = Rig()
-    r.look(1.5, LG_YAW)
+    r.look(1.5, EXTERNAL_YAW)
     r.look(1.5, LAP_YAW)
     assert r.fake.brought == [11, 1] and r.fake.fg == 1
 
@@ -130,10 +130,10 @@ def test_typing_freezes_until_the_thaw():
     def typing(rig):
         rig.input.on_event(rig.now, RawEvent("key", injected=False, key_down=True))
 
-    r.look(1.0, LG_YAW, every_frame=typing)  # glancing at the LG while typing
+    r.look(1.0, EXTERNAL_YAW, every_frame=typing)  # glancing at the external monitor while typing
     assert r.fake.brought == []
     last_key = r.input.last_key_t
-    r.look(2.0, LG_YAW)
+    r.look(2.0, EXTERNAL_YAW)
     assert r.fake.brought == [11]
     assert any("BLOCKED(typing" in l for l in r.lines.lines)
     assert last_key is not None
@@ -142,19 +142,19 @@ def test_typing_freezes_until_the_thaw():
 def test_a_held_mouse_button_is_read_live_every_frame():  # Review Focus #1
     r = Rig()
     r.fake.buttons = True
-    r.look(1.0, LG_YAW)
+    r.look(1.0, EXTERNAL_YAW)
     assert r.fake.brought == []
     r.fake.buttons = False  # released: no stale "held" state anywhere
-    r.look(0.2, LG_YAW)
+    r.look(0.2, EXTERNAL_YAW)
     assert r.fake.brought == [11]
 
 
 def test_manual_focus_change_cools_down():
     r = Rig()
-    r.look(0.4, LG_YAW)
+    r.look(0.4, EXTERNAL_YAW)
     r.mru.on_foreground(r.now, 2, LAP_DEV)  # the user clicked a laptop window
     r.fake.fg = 2
-    r.look(0.5, LG_YAW)
+    r.look(0.5, EXTERNAL_YAW)
     assert r.fake.brought == []
     assert any("BLOCKED(manual focus cooldown)" in l for l in r.lines.lines)
 
@@ -162,40 +162,40 @@ def test_manual_focus_change_cools_down():
 def test_fullscreen_blocks():
     r = Rig()
     r.fake.full = True
-    r.look(1.5, LG_YAW)
+    r.look(1.5, EXTERNAL_YAW)
     assert r.fake.brought == [] and any("fullscreen app" in l for l in r.lines.lines)
 
 
 def test_a_refused_switch_is_tried_once_and_logged_once():  # Review Focus #6 (elevated window)
     r = Rig()
     r.fake.fail_with = "refused (elevated window or focus lock)"
-    r.look(3.0, LG_YAW)
+    r.look(3.0, EXTERNAL_YAW)
     assert r.fake.brought == [11]
     assert sum("FAIL" in l for l in r.lines.lines) == 1
     assert any("switch failed; look away to retry" in l for l in r.lines.lines)
 
 
-def test_an_empty_lg_is_noted_and_not_retried():
+def test_an_empty_external_is_noted_and_not_retried():
     r = Rig()
-    r.fake.lg_windows = []
-    r.look(2.0, LG_YAW)
+    r.fake.external_windows = []
+    r.look(2.0, EXTERNAL_YAW)
     assert r.fake.brought == []
-    assert sum("no window to focus on LG" in l for l in r.lines.lines) == 1
+    assert sum("no window to focus on EXTERNAL" in l for l in r.lines.lines) == 1
 
 
-def test_an_unplugged_lg_is_never_attempted():  # Review Focus #4 (transient, before re-layout)
-    r = Rig(zone_devices={Zone.LAPTOP: LAP_DEV, Zone.LG: None})
-    r.look(2.0, LG_YAW)
-    assert r.fake.brought == [] and sum("LG is not connected" in l for l in r.lines.lines) == 1
+def test_an_unplugged_external_is_never_attempted():  # Review Focus #4 (transient, before re-layout)
+    r = Rig(zone_devices={Zone.LAPTOP: LAP_DEV, Zone.EXTERNAL: None})
+    r.look(2.0, EXTERNAL_YAW)
+    assert r.fake.brought == [] and sum("EXTERNAL is not connected" in l for l in r.lines.lines) == 1
 
 
 def test_cursor_warps_to_where_it_was_on_that_monitor_only_if_the_mouse_is_idle():
     r = Rig()
-    r.fake.cursor = (-400, 300)  # the cursor visits the LG, then goes back to the laptop
+    r.fake.cursor = (-400, 300)  # the cursor visits the external monitor, then goes back to the laptop
     r.look(0.1, LAP_YAW)
     r.fake.cursor = (900, 700)
     r.look(0.5, LAP_YAW)
-    r.look(1.5, LG_YAW)
+    r.look(1.5, EXTERNAL_YAW)
     assert r.fake.warped == [(-400, 300)]
 
 
@@ -205,19 +205,19 @@ def test_no_warp_while_the_mouse_is_in_use():
     def moving(rig):
         rig.input.on_event(rig.now, RawEvent("mouse", injected=False, moved=True))
 
-    r.look(1.5, LG_YAW, every_frame=moving)
+    r.look(1.5, EXTERNAL_YAW, every_frame=moving)
     assert r.fake.brought == [11] and r.fake.warped == []
 
 
 def test_warp_falls_back_to_the_window_centre_clamped_to_the_work_area():
     r = Rig()
-    r.look(1.5, LG_YAW)  # the cursor has never been on the LG
+    r.look(1.5, EXTERNAL_YAW)  # the cursor has never been on the external monitor
     assert r.fake.warped == [(-960, 238)]
 
 
 def test_focus_zone_follows_the_live_foreground():
     r = Rig()
     r.fake.fg = 12
-    assert r.ctrl.focus_zone() is Zone.LG
+    assert r.ctrl.focus_zone() is Zone.EXTERNAL
     r.fake.fg = 999  # a window on no known monitor
     assert r.ctrl.focus_zone() is Zone.UNKNOWN

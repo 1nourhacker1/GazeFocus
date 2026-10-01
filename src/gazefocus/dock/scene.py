@@ -30,7 +30,7 @@ from gazefocus.dock.motion import (
 from gazefocus.dock.view import ALERT, PAUSED, TRACKING, DockView
 from gazefocus.types import Zone
 
-TILES = {Zone.LG: (18.0, 10.0, 22.0, 14.0), Zone.LAPTOP: (48.0, 14.0, 22.0, 14.0)}  # x, y, w, h
+TILES = {Zone.EXTERNAL: (18.0, 10.0, 22.0, 14.0), Zone.LAPTOP: (48.0, 14.0, 22.0, 14.0)}  # x, y, w, h
 BIG, SMALL = 1.18, 0.9
 INSET = 1.7  # the water sits this far inside a tile's outline
 SWITCH_S = 0.58
@@ -223,7 +223,7 @@ class GlyphScene:
                 fill=f,
                 level=level(z, f),
                 amp=self.amp[z].get(now) * min(1.0, f * 3),
-                phase=PHASE_RATE * now + (0.0 if z is Zone.LG else 1.9),
+                phase=PHASE_RATE * now + (0.0 if z is Zone.EXTERNAL else 1.9),
                 scale=self.scale[z].get(now),
                 lid=0.95 * lid if z == focus else 0.0,
             )

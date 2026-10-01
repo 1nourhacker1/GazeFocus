@@ -60,7 +60,7 @@ def commit_calibration(
         return CommitResult(
             False,
             f"calibration too close ({model.separation:.1f} sigma): turn your head a little more toward each "
-            "screen, or move the LG closer to the laptop. The previous calibration was kept.",
+            "screen, or move the external monitor closer to the laptop. The previous calibration was kept.",
         )
     path = path or calibration_path()
     cal = Calibration(
@@ -79,6 +79,6 @@ def commit_calibration(
         save_samples(path.with_name(SAMPLES_FILE), samples)
     return CommitResult(
         True,
-        f"saved {path} ({model.separation:.1f} sigma, {q}; mean yaw LG {model.mean_lg[0]:+.1f}, "
+        f"saved {path} ({model.separation:.1f} sigma, {q}; mean yaw EXTERNAL {model.mean_external[0]:+.1f}, "
         f"laptop {model.mean_laptop[0]:+.1f})",
     )

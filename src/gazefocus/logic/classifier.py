@@ -2,7 +2,7 @@
 
 The discriminant uses a *diagonal* pooled covariance, so every weight follows its own
 feature's mean difference. The first real calibration showed full-covariance LDA exploiting
-the pitch<->eyelid correlation and pointing "LG" whenever the user looked down.
+the pitch<->eyelid correlation and pointing "EXTERNAL" whenever the user looked down.
 """
 
 from __future__ import annotations
@@ -32,12 +32,12 @@ def features(s: HeadSample) -> np.ndarray:
 
 @dataclass(frozen=True)
 class ZoneModel:
-    """z(f) = w.f + b, scaled so the LG mean maps to -1 and the laptop mean to +1."""
+    """z(f) = w.f + b, scaled so the external monitor mean maps to -1 and the laptop mean to +1."""
 
     w: tuple[float, ...]
     b: float
     separation: float
-    mean_lg: tuple[float, ...]
+    mean_external: tuple[float, ...]
     mean_laptop: tuple[float, ...]
     sd: tuple[float, ...]  # pooled within-screen standard deviation per feature
 
@@ -47,14 +47,14 @@ class ZoneModel:
     def is_outlier(self, f, sigma: float) -> bool:
         """True when pitch or iris_h is more than `sigma` sd from BOTH screens (e.g. looking at a phone).
 
-        iris_h is not gated once the head is turned past the LG: the eyes lead a big head turn,
-        so extreme iris offsets there still mean "LG" (review finding, second desk recording).
+        iris_h is not gated once the head is turned past the external monitor: the eyes lead a big head turn,
+        so extreme iris offsets there still mean "EXTERNAL" (review finding, second desk recording).
         """
         f, sd = np.asarray(f, dtype=float), np.maximum(np.asarray(self.sd), OOD_SD_FLOOR)
-        lg_side = np.sign(self.mean_lg[0] - self.mean_laptop[0])
-        past_lg = (f[0] - self.mean_lg[0]) * lg_side > 0
-        idx = [1] if past_lg else list(_OOD_FEATURES)
-        far = [np.max(np.abs(f[idx] - np.asarray(mean)[idx]) / sd[idx]) for mean in (self.mean_lg, self.mean_laptop)]
+        external_side = np.sign(self.mean_external[0] - self.mean_laptop[0])
+        past_external = (f[0] - self.mean_external[0]) * external_side > 0
+        idx = [1] if past_external else list(_OOD_FEATURES)
+        far = [np.max(np.abs(f[idx] - np.asarray(mean)[idx]) / sd[idx]) for mean in (self.mean_external, self.mean_laptop)]
         return min(far) > sigma
 
     def to_dict(self) -> dict:
@@ -62,7 +62,7 @@ class ZoneModel:
             "w": list(self.w),
             "b": self.b,
             "separation": self.separation,
-            "mean_lg": list(self.mean_lg),
+            "mean_external": list(self.mean_external),
             "mean_laptop": list(self.mean_laptop),
             "sd": list(self.sd),
         }
@@ -73,7 +73,7 @@ class ZoneModel:
             w=tuple(float(v) for v in d["w"]),
             b=float(d["b"]),
             separation=float(d["separation"]),
-            mean_lg=tuple(float(v) for v in d["mean_lg"]),
+            mean_external=tuple(float(v) for v in d["mean_external"]),
             mean_laptop=tuple(float(v) for v in d["mean_laptop"]),
             sd=tuple(float(v) for v in d["sd"]),
         )
@@ -94,11 +94,11 @@ def _trim_turn_frames(x: np.ndarray) -> np.ndarray:
     return x[np.abs(yaw - med) <= TRIM_MADS * mad]
 
 
-def fit_zone_model(lg: Sequence[HeadSample], laptop: Sequence[HeadSample]) -> ZoneModel:
-    a, b = _trim_turn_frames(_face_matrix(lg)), _trim_turn_frames(_face_matrix(laptop))
+def fit_zone_model(ext: Sequence[HeadSample], laptop: Sequence[HeadSample]) -> ZoneModel:
+    a, b = _trim_turn_frames(_face_matrix(ext)), _trim_turn_frames(_face_matrix(laptop))
     if len(a) < MIN_SAMPLES or len(b) < MIN_SAMPLES:
         raise ValueError(
-            f"need at least {MIN_SAMPLES} face samples per screen (got LG={len(a)}, laptop={len(b)})"
+            f"need at least {MIN_SAMPLES} face samples per screen (got EXTERNAL={len(a)}, laptop={len(b)})"
         )
     ma, mb = a.mean(axis=0), b.mean(axis=0)
     var = (a.var(axis=0, ddof=1) * (len(a) - 1) + b.var(axis=0, ddof=1) * (len(b) - 1)) / (len(a) + len(b) - 2)
@@ -114,7 +114,7 @@ def fit_zone_model(lg: Sequence[HeadSample], laptop: Sequence[HeadSample]) -> Zo
         w=tuple(float(v) for v in scale * w_raw),
         b=-(pa + pb) / (pb - pa),
         separation=float(np.sqrt(spread)),
-        mean_lg=tuple(float(v) for v in ma),
+        mean_external=tuple(float(v) for v in ma),
         mean_laptop=tuple(float(v) for v in mb),
         sd=tuple(float(v) for v in np.sqrt(var)),
     )
@@ -137,12 +137,12 @@ class ZoneClassifier:
         self._m: float | None = None
         self._last_valid_t: float | None = None  # last frame that produced a margin (not gated, face present)
         self._lost = False
-        self._latched_lg = False
+        self._latched_external = False
         self._restart = False  # set on face loss: the EMA restarts from the next face frame
 
     def _zone(self, m: float) -> Zone:
         if m <= -self.cfg.dead_band:
-            return Zone.LG
+            return Zone.EXTERNAL
         if m >= self.cfg.dead_band:
             return Zone.LAPTOP
         return Zone.UNKNOWN
@@ -150,7 +150,7 @@ class ZoneClassifier:
     def update(self, s: HeadSample) -> tuple[Zone, float | None]:
         if s.face:
             f = features(s)
-            self._lost, self._latched_lg = False, False
+            self._lost, self._latched_external = False, False
             if not np.all(np.isfinite(f)) or self.model.is_outlier(f, self.cfg.ood_sigma):
                 self._restart = True  # after looking at neither screen, start the EMA fresh
                 return Zone.UNKNOWN, None  # keep it out of the EMA and out of the face-lost memory
@@ -162,7 +162,7 @@ class ZoneClassifier:
             self._lost = True
             self._restart = True
             recent = self._last_valid_t is not None and s.t - self._last_valid_t <= self.cfg.face_lost_memory_s
-            self._latched_lg = bool(recent and self._m is not None and self._m <= self.cfg.face_lost_lg_margin)
-        if self._latched_lg:
-            return Zone.LG, self._m
+            self._latched_external = bool(recent and self._m is not None and self._m <= self.cfg.face_lost_external_margin)
+        if self._latched_external:
+            return Zone.EXTERNAL, self._m
         return Zone.UNKNOWN, None

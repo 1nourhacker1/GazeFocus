@@ -12,8 +12,8 @@ MODEL_SHA256 = "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
 def test_types_are_frozen_and_defaulted():
     s = HeadSample(t=1.0, face=True)
     assert (s.yaw, s.pitch, s.iris_h, s.iris_v) == (0.0, 0.0, 0.0, 0.0)
-    d = Decision(t=1.0, zone=Zone.LG, margin=-0.9, action="switch", reason="dwell met", target=Zone.LG)
-    assert d.target is Zone.LG
+    d = Decision(t=1.0, zone=Zone.EXTERNAL, margin=-0.9, action="switch", reason="dwell met", target=Zone.EXTERNAL)
+    assert d.target is Zone.EXTERNAL
     with pytest.raises(dataclasses.FrozenInstanceError):
         s.t = 2.0  # type: ignore[misc]
 

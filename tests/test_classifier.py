@@ -25,9 +25,9 @@ def test_features_are_yaw_pitch_iris_h():
 
 
 def test_fit_maps_screen_means_to_minus_and_plus_one(rng):
-    lg, lap = cluster(rng, 80, 32, 7, 0.2, 0.0), cluster(rng, 80, -2, 12, 0.0, 0.0)
-    m = fit_zone_model(lg, lap)
-    assert m.z(np.array(m.mean_lg)) == pytest.approx(-1.0, abs=1e-9)
+    ext, lap = cluster(rng, 80, 32, 7, 0.2, 0.0), cluster(rng, 80, -2, 12, 0.0, 0.0)
+    m = fit_zone_model(ext, lap)
+    assert m.z(np.array(m.mean_external)) == pytest.approx(-1.0, abs=1e-9)
     assert m.z(np.array(m.mean_laptop)) == pytest.approx(1.0, abs=1e-9)
     assert m.separation > 4 and quality(m.separation) == "excellent"
     assert len(m.sd) == len(FEATURES) and all(v > 0 for v in m.sd)
@@ -37,36 +37,36 @@ def test_weights_follow_mean_differences_not_correlations(rng):
     """Desk session 2026-09-29: full-covariance LDA gave pitch a weight whose sign contradicted
     the class means, because pitch and eyelid noise were correlated. Weights must follow the
     per-feature mean difference."""
-    lg, lap = [], []
+    ext, lap = [], []
     for i in range(80):
-        for out, yaw, ih in ((lg, 32.0, 0.05), (lap, -2.0, 0.0)):
+        for out, yaw, ih in ((ext, 32.0, 0.05), (lap, -2.0, 0.0)):
             n = rng.normal()
             out.append(HeadSample(i / 15, True, yaw=yaw + rng.normal(0, 5), pitch=10 + 5 * n, iris_h=ih + 0.1 * n))
-    m = fit_zone_model(lg, lap)
-    diff = np.array(m.mean_laptop) - np.array(m.mean_lg)
+    m = fit_zone_model(ext, lap)
+    diff = np.array(m.mean_laptop) - np.array(m.mean_external)
     for w, d in zip(m.w, diff):
         assert w == 0 or np.sign(w) == np.sign(d)
     assert abs(m.w[0] * m.sd[0]) > 5 * abs(m.w[1] * m.sd[1])  # yaw dominates pitch
 
 
 def test_looking_down_at_the_laptop_stays_laptop(rng):
-    lg, lap = cluster(rng, 80, 30, 8, 0.2, 0.0), cluster(rng, 80, 0, 12, 0.0, 0.0)
-    c = ZoneClassifier(fit_zone_model(lg, lap), ClassifierCfg())
+    ext, lap = cluster(rng, 80, 30, 8, 0.2, 0.0), cluster(rng, 80, 0, 12, 0.0, 0.0)
+    c = ZoneClassifier(fit_zone_model(ext, lap), ClassifierCfg())
     zone, _ = c.update(HeadSample(0.0, True, yaw=0.0, pitch=18.0, iris_h=0.0))
     assert zone is Zone.LAPTOP
 
 
 def test_turn_frames_are_trimmed_from_calibration(rng):
-    lg = cluster(rng, 60, 30, 8, 0.2, 0.0) + cluster(rng, 20, 2, 12, 0.0, 0.0)  # 25 % leaked laptop frames
+    ext = cluster(rng, 60, 30, 8, 0.2, 0.0) + cluster(rng, 20, 2, 12, 0.0, 0.0)  # 25 % leaked laptop frames
     lap = cluster(rng, 80, 0, 12, 0.0, 0.0)
-    m = fit_zone_model(lg, lap)
-    assert m.mean_lg[0] == pytest.approx(30, abs=2.0)
+    m = fit_zone_model(ext, lap)
+    assert m.mean_external[0] == pytest.approx(30, abs=2.0)
 
 
 def test_fit_handles_a_constant_feature(rng):
-    lg = [HeadSample(s.t, True, s.yaw, s.pitch, 0.0, 0.0) for s in cluster(rng, 40, 32, 7, 0, 0)]
+    ext = [HeadSample(s.t, True, s.yaw, s.pitch, 0.0, 0.0) for s in cluster(rng, 40, 32, 7, 0, 0)]
     lap = [HeadSample(s.t, True, s.yaw, s.pitch, 0.0, 0.0) for s in cluster(rng, 40, -2, 12, 0, 0)]
-    m = fit_zone_model(lg, lap)
+    m = fit_zone_model(ext, lap)
     assert np.all(np.isfinite(m.w)) and m.separation > 4
 
 
@@ -97,8 +97,8 @@ def test_model_dict_round_trip(rng):
     assert ZoneModel.from_dict(m.to_dict()) == m
 
 
-# Hand-built model: z = yaw/15 + 1  ->  yaw -30 => z -1 (LG), yaw 0 => z +1 (laptop); pitch sd 5
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 10, 0), mean_laptop=(0, 10, 0), sd=(10.0, 5.0, 0.1))
+# Hand-built model: z = yaw/15 + 1  ->  yaw -30 => z -1 (EXTERNAL), yaw 0 => z +1 (laptop); pitch sd 5
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_external=(-30, 10, 0), mean_laptop=(0, 10, 0), sd=(10.0, 5.0, 0.1))
 
 
 def s(t, yaw=None, pitch=10.0):
@@ -113,7 +113,7 @@ def test_ema_and_dead_band():
     zone, m = c.update(s(0.2, -30))  # 0.30 + 0.35 * (-1.30) = -0.155
     assert zone is Zone.UNKNOWN and m == pytest.approx(-0.155)
     zone, m = c.update(s(0.3, -30))  # -0.155 + 0.35 * (-0.845) = -0.45075
-    assert zone is Zone.LG and m == pytest.approx(-0.45075)
+    assert zone is Zone.EXTERNAL and m == pytest.approx(-0.45075)
 
 
 def test_far_off_pitch_is_unknown_and_not_fed_to_the_ema():
@@ -125,20 +125,20 @@ def test_far_off_pitch_is_unknown_and_not_fed_to_the_ema():
     assert zone is Zone.LAPTOP and m == pytest.approx(1.0)  # the outlier never entered the EMA
 
 
-def test_yaw_past_the_lg_is_not_an_outlier():
+def test_yaw_past_the_external_is_not_an_outlier():
     c = ZoneClassifier(TOY, ClassifierCfg())
-    assert c.update(s(0.0, -80))[0] is Zone.LG  # turned far beyond the LG: still LG
+    assert c.update(s(0.0, -80))[0] is Zone.EXTERNAL  # turned far beyond the external monitor: still EXTERNAL
 
 
-def test_face_lost_after_hard_left_turn_latches_lg():
+def test_face_lost_after_hard_left_turn_latches_external():
     c = ZoneClassifier(TOY, ClassifierCfg())
     c.update(s(0.0, -45))  # z = -2.0 <= -1.2
-    assert c.update(s(0.066)) == (Zone.LG, pytest.approx(-2.0))
-    assert c.update(s(2.0)) == (Zone.LG, pytest.approx(-2.0))  # stays latched while lost
+    assert c.update(s(0.066)) == (Zone.EXTERNAL, pytest.approx(-2.0))
+    assert c.update(s(2.0)) == (Zone.EXTERNAL, pytest.approx(-2.0))  # stays latched while lost
     assert c.update(s(2.1, 0)) == (Zone.LAPTOP, pytest.approx(1.0))  # EMA restarts on reacquire
 
 
-def test_face_lost_after_mild_lg_is_unknown():
+def test_face_lost_after_mild_external_is_unknown():
     c = ZoneClassifier(TOY, ClassifierCfg())
     c.update(s(0.0, -30))  # z = -1.0 > -1.2
     assert c.update(s(0.066)) == (Zone.UNKNOWN, None)
@@ -153,7 +153,7 @@ def test_face_lost_after_a_long_gap_is_unknown():
 def test_outlier_gate_has_a_realistic_minimum_spread():
     """Desk session: a steady calibration gave pitch sd = 1.0 (the variance floor), so reading the
     bottom edge of the laptop (a few degrees lower) was flagged as 'neither screen'."""
-    tight = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=15.0, mean_lg=(-30, 1, 0), mean_laptop=(0, 7, 0),
+    tight = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=15.0, mean_external=(-30, 1, 0), mean_laptop=(0, 7, 0),
                       sd=(2.0, 1.0, 0.05))
     assert not tight.is_outlier([0.0, 7 + 8.0, 0.0], 3.5)  # 8 deg below the laptop mean: still the laptop
     assert not tight.is_outlier([0.0, 7.0, 0.3], 3.5)  # eyes a little to the side
@@ -166,26 +166,26 @@ def lean(t):  # face present, looking far down at a phone: pitch 10 + 5 sd*5 = 3
     return HeadSample(t=t, face=True, yaw=0.0, pitch=35.0)
 
 
-def test_phone_lean_after_a_hard_lg_margin_does_not_latch_lg():
+def test_phone_lean_after_a_hard_external_margin_does_not_latch_external():
     c = ZoneClassifier(TOY, ClassifierCfg())
-    c.update(s(0.0, -45))  # z = -2.0, a hard LG margin
+    c.update(s(0.0, -45))  # z = -2.0, a hard EXTERNAL margin
     for i in range(1, 30):  # 2 s of gated "neither screen" frames
         assert c.update(lean(i / 15))[0] is Zone.UNKNOWN
     assert c.update(s(2.1)) == (Zone.UNKNOWN, None)  # face lost: the last *valid* margin is 2 s old
 
 
-def test_high_yaw_with_eyes_to_the_same_side_stays_lg():
+def test_high_yaw_with_eyes_to_the_same_side_stays_external():
     c = ZoneClassifier(TOY, ClassifierCfg())
-    far = HeadSample(t=0.0, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8)  # 8 sd of iris_h, but past the LG
-    assert c.update(far)[0] is Zone.LG
+    far = HeadSample(t=0.0, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8)  # 8 sd of iris_h, but past the external monitor
+    assert c.update(far)[0] is Zone.EXTERNAL
 
 
-def test_face_loss_right_after_a_past_the_lg_turn_latches_lg():
+def test_face_loss_right_after_a_past_the_external_turn_latches_external():
     c = ZoneClassifier(TOY, ClassifierCfg())
     for i in range(5):
         c.update(HeadSample(t=i / 15, face=True, yaw=-60.0, pitch=10.0, iris_h=0.8))
     zone, m = c.update(s(5 / 15 + 0.1))
-    assert zone is Zone.LG and m is not None and m <= -1.2
+    assert zone is Zone.EXTERNAL and m is not None and m <= -1.2
 
 
 def test_non_finite_features_are_ignored_not_fed_to_the_ema():

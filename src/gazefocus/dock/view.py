@@ -17,7 +17,7 @@ ALERT_TITLES = {
     Status.UNSUPPORTED: "Unsupported monitor layout",
     Status.TRACKER_FAILED: "Tracker failed",
 }
-NAMES = {Zone.LG: "LG", Zone.LAPTOP: "Laptop"}
+NAMES = {Zone.EXTERNAL: "EXTERNAL", Zone.LAPTOP: "Laptop"}
 
 
 @dataclass(frozen=True)

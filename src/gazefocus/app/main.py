@@ -214,10 +214,10 @@ class GazeFocusApp:
             self.log.warning(warning or "not calibrated yet: use the tray's Recalibrate")
             return
         devices = {m.id: m.device for m in self.monitors}
-        zone_devices = {Zone.LAPTOP: devices.get(cal.zone_monitors.get("LAPTOP")), Zone.LG: devices.get(cal.zone_monitors.get("LG"))}
+        zone_devices = {Zone.LAPTOP: devices.get(cal.zone_monitors.get("LAPTOP")), Zone.EXTERNAL: devices.get(cal.zone_monitors.get("EXTERNAL"))}
         if None in zone_devices.values():
             self.state.calibration = "unsupported"
-            self.log.warning("the calibration does not name both monitors; recalibrate with the LG connected")
+            self.log.warning("the calibration does not name both monitors; recalibrate with the external monitor connected")
             return
         self.state.calibration = "ok"
         self.controller = Controller(
@@ -230,8 +230,8 @@ class GazeFocusApp:
             cursor_idle_warp_ms=self.cfg.decider.cursor_idle_warp_ms,
             log=self.dlog,
         )
-        self.log.info("calibration loaded (%.1f sigma); LAPTOP=%s LG=%s", cal.model.separation,
-                      zone_devices[Zone.LAPTOP], zone_devices[Zone.LG])
+        self.log.info("calibration loaded (%.1f sigma); LAPTOP=%s EXTERNAL=%s", cal.model.separation,
+                      zone_devices[Zone.LAPTOP], zone_devices[Zone.EXTERNAL])
 
     # ---- the camera ------------------------------------------------------------------------
     def apply(self) -> None:
@@ -418,10 +418,10 @@ class GazeFocusApp:
         self.dock.show_intro(self._start_run, lambda: self.cancel_calibration("Not now"))
 
     def _screens(self, monitors: list[MonitorInfo]) -> dict | None:
-        """{"LG": rect, "LAPTOP": rect} in Qt's logical coordinates, or None (and the user is told why)."""
+        """{"EXTERNAL": rect, "LAPTOP": rect} in Qt's logical coordinates, or None (and the user is told why)."""
         if len(monitors) != 2:
             self.tray.notify("Can't calibrate yet", f"GazeFocus needs 2 monitors and sees {len(monitors)}: "
-                             "connect the LG, then Recalibrate.")
+                             "connect the external monitor, then Recalibrate.")
             self.log.warning("recalibrate refused: %d monitor(s)", len(monitors))
             return None
         by_id = {m.id: m for m in monitors}
@@ -464,7 +464,7 @@ class GazeFocusApp:
             self.dock.raise_to_top()  # the overlay was shown after the dock
 
     def _cue(self, name: str) -> None:
-        """The beeps (1 = LG, 2 = laptop, 3 = done), off the Qt thread: winsound.Beep blocks."""
+        """The beeps (1 = the external monitor, 2 = the laptop, 3 = done), off the Qt thread: winsound.Beep blocks."""
         threading.Thread(target=self.beep, args=(name,), name="gazefocus-beep", daemon=True).start()
 
     def _run_done(self, result) -> None:
@@ -516,7 +516,7 @@ class GazeFocusApp:
 
     def _redo(self) -> None:
         self._result, self._preview = None, None
-        self._start_run()  # straight to the LG: no intro
+        self._start_run()  # straight to the external monitor: no intro
 
     def _end_calibration(self) -> None:
         if self._run is not None:

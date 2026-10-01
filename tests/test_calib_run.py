@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject, Signal
 from gazefocus.calib.run import CalibrationRun
 from gazefocus.types import HeadSample
 
-LG = (-1920.0, -302.0, 1920.0, 1080.0)
+EXTERNAL = (-1920.0, -302.0, 1920.0, 1080.0)
 LAP = (0.0, 0.0, 1706.0, 1066.0)
 DOCK = (853.0, 30.0)
 
@@ -58,7 +58,7 @@ class FakeOverlay:
 def make(qapp):
     clock, ticker, overlay = FakeClock(), ManualTicker(), FakeOverlay()
     got = {"cues": [], "done": [], "opened": 0}
-    run = CalibrationRun({"LG": LG, "LAPTOP": LAP}, DOCK, on_done=got["done"].append, cue=got["cues"].append,
+    run = CalibrationRun({"EXTERNAL": EXTERNAL, "LAPTOP": LAP}, DOCK, on_done=got["done"].append, cue=got["cues"].append,
                          on_open=lambda: got.__setitem__("opened", got["opened"] + 1),
                          overlay=overlay, ticker=ticker, clock=clock)
     return run, clock, ticker, overlay, got
@@ -86,7 +86,7 @@ def test_a_run_beeps_for_each_screen_then_reports_its_result(qapp):
     run, clock, ticker, overlay, got = make(qapp)
     run.start()
     drive(run, clock, ticker, 20.0)
-    assert got["cues"] == ["LG", "LAPTOP", "DONE"]
+    assert got["cues"] == ["EXTERNAL", "LAPTOP", "DONE"]
     assert len(got["done"]) == 1 and got["done"][0].can_save
     assert overlay.hidden == 1 and not ticker.running and ticker.closed and not run.active
     assert overlay.frames[0].phase == "start"

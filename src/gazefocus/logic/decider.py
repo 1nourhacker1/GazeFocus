@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from gazefocus.config import DeciderCfg
 from gazefocus.types import Decision, Zone
 
-_KNOWN = (Zone.LG, Zone.LAPTOP)
+_KNOWN = (Zone.EXTERNAL, Zone.LAPTOP)
 
 
 def reason_category(reason: str) -> str:

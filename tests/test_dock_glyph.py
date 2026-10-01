@@ -38,7 +38,7 @@ def near(rgba, rgb, tol=12):
 
 
 def test_the_focused_tile_holds_green_water(qapp):
-    img = render(frame_of(DockView(TRACKING, Zone.LG)))
+    img = render(frame_of(DockView(TRACKING, Zone.EXTERNAL)))
     assert near(px(img, 29, 20), GREEN[False])
     assert px(img, 59, 22)[3] == 0  # the laptop tile is empty inside
 
@@ -49,7 +49,7 @@ def test_dark_backdrops_get_the_brighter_green(qapp):
 
 
 def test_frozen_water_is_amber_under_a_lid(qapp):
-    frozen = render(frame_of(DockView(TRACKING, Zone.LG), DockView(TRACKING, Zone.LG, last_key_t=5.0), at=5.2))
+    frozen = render(frame_of(DockView(TRACKING, Zone.EXTERNAL), DockView(TRACKING, Zone.EXTERNAL, last_key_t=5.0), at=5.2))
     water = px(frozen, 29, 21)
     assert near(water, AMBER[False], tol=16)
     lid_v = 17 + (12.5 - 17) * 1.18  # the lid line (tile y + 2.5), scaled 1.18 about the tile's centre
@@ -57,25 +57,25 @@ def test_frozen_water_is_amber_under_a_lid(qapp):
 
 
 def test_paused_shows_the_bars_and_no_water(qapp):
-    img = render(frame_of(DockView(TRACKING, Zone.LG), DockView(PAUSED, Zone.LG)))
+    img = render(frame_of(DockView(TRACKING, Zone.EXTERNAL), DockView(PAUSED, Zone.EXTERNAL)))
     assert px(img, 41.6, 18.5)[3] > 150 and px(img, 46.4, 18.5)[3] > 150
     assert px(img, 29, 20)[3] == 0
 
 
 def test_alert_shows_an_amber_exclamation(qapp):
-    img = render(frame_of(DockView(TRACKING, Zone.LG), DockView(ALERT, Zone.LG)))
+    img = render(frame_of(DockView(TRACKING, Zone.EXTERNAL), DockView(ALERT, Zone.EXTERNAL)))
     assert near(px(img, 44, 16), AMBER[False], tol=16) and near(px(img, 44, 23.4), AMBER[False], tol=16)
 
 
 def test_outlines_are_drawn_even_with_no_water(qapp):
-    img = render(frame_of(DockView(TRACKING, Zone.LG, face=False)))
-    edge = px(img, 18 - 0.4, 17)  # the LG outline's left side (scaled 1.18 about x = 29)
+    img = render(frame_of(DockView(TRACKING, Zone.EXTERNAL, face=False)))
+    edge = px(img, 18 - 0.4, 17)  # the external monitor outline's left side (scaled 1.18 about x = 29)
     assert max(px(img, 29 - 11 * 1.18, 17)[3], edge[3]) > 60
 
 
 def test_the_flow_draws_droplets_between_the_tiles(qapp):
     s = GlyphScene(seed=3)
-    s.update(DockView(TRACKING, Zone.LG), 0.0)
+    s.update(DockView(TRACKING, Zone.EXTERNAL), 0.0)
     s.update(DockView(TRACKING, Zone.LAPTOP), 1.0)
     f = s.frame(1.3)
     assert f.drops
@@ -90,5 +90,5 @@ def test_smooth_union_melts_nearby_shapes_together(qapp):
 
 
 def test_goo_is_skipped_when_there_is_nothing_wet(qapp):
-    f = frame_of(DockView(TRACKING, Zone.LG), DockView(PAUSED, Zone.LG))
+    f = frame_of(DockView(TRACKING, Zone.EXTERNAL), DockView(PAUSED, Zone.EXTERNAL))
     assert goo_field(f, 4.0) is None and goo_image(f, 4.0, (0, 0, 0)) is None

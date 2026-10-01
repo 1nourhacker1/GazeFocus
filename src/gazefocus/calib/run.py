@@ -30,7 +30,7 @@ class CalibrationRun:
         native: bool = True,
         refraction: bool = True,
     ) -> None:
-        self.session = CalibrationSession(screens["LG"], screens["LAPTOP"], dock)
+        self.session = CalibrationSession(screens["EXTERNAL"], screens["LAPTOP"], dock)
         if overlay is None:
             from gazefocus.calib.overlay import Overlay
 

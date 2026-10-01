@@ -64,15 +64,15 @@ def cmd_calibrate(args) -> int:
     cfg = _config()
     monitors = enumerate_monitors()
     zones = zone_monitors(monitors, cfg.dock.monitor)
-    if zones["LG"] is None:
-        print("note: the LG is not connected; its position is calibrated anyway (dry-run use until it is plugged in)")
+    if zones["EXTERNAL"] is None:
+        print("note: the external monitor is not connected; its position is calibrated anyway (dry-run use until it is plugged in)")
     cam = _open_camera(cfg)
     if cam is None:
         return EXIT_CAMERA
     backend, tracker = cam.backend, _tracker()
     samples: dict = {}
     try:
-        print("listen for beeps: 1 = look at the LG, 2 = look at the laptop, 3 = done")
+        print("listen for beeps: 1 = look at the external monitor, 2 = look at the laptop, 3 = done")
         model, counts = calibrate(
             cam.read, tracker.process, seconds=args.seconds, fps=cfg.camera.fps, cue=_beep, samples_out=samples
         )
@@ -192,7 +192,7 @@ def cmd_dock_demo(args) -> int:
 
 
 def _diag_zone_devices() -> tuple[dict, str]:
-    """{zone: device} from a matching calibration, else primary = LAPTOP and the other = LG."""
+    """{zone: device} from a matching calibration, else primary = LAPTOP and the other = EXTERNAL."""
     from gazefocus.storage import calibration_path, load_if_matches
     from gazefocus.win.monitors import enumerate_monitors, layout_fingerprint
 
@@ -203,7 +203,7 @@ def _diag_zone_devices() -> tuple[dict, str]:
         return {z: by_id.get(i) for z, i in cal.zone_monitors.items()}, "calibration"
     primary = next((m.device for m in monitors if m.primary), None)
     others = [m.device for m in monitors if not m.primary]
-    return {"LAPTOP": primary, "LG": others[0] if len(others) == 1 else None}, "primary/other guess"
+    return {"LAPTOP": primary, "EXTERNAL": others[0] if len(others) == 1 else None}, "primary/other guess"
 
 
 def cmd_diag(args) -> int:
@@ -255,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("probe", help="guided tracking and speed measurement (spike M0-A)").set_defaults(fn=cmd_probe)
     sub.add_parser("live", help="live mirrored camera view with the head-pose overlay").set_defaults(fn=cmd_live)
-    c = sub.add_parser("calibrate-cli", help="terminal calibration: LG, then laptop")
+    c = sub.add_parser("calibrate-cli", help="terminal calibration: the external monitor, then the laptop")
     c.add_argument("--seconds", type=float, default=6.0)
     c.add_argument("--force", action="store_true", help="save even a 'too close' calibration")
     c.set_defaults(fn=cmd_calibrate)
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     dw = dsub.add_parser("windows", help="focus targets per monitor, in Z-order")
     dw.add_argument("--all", action="store_true", help="also list rejected windows with the reason")
     df = dsub.add_parser("focus", help="focus the top window on a screen (spike M0-B)")
-    df.add_argument("zone", choices=("LAPTOP", "LG"))
+    df.add_argument("zone", choices=("LAPTOP", "EXTERNAL"))
     df.add_argument("--delay", type=float, default=3.0, help="seconds to click elsewhere first")
     d.set_defaults(fn=cmd_diag)
     configure_console()

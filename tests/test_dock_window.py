@@ -98,7 +98,7 @@ def test_the_first_frame_is_a_pill_with_transparent_surroundings(dock):
 
 def test_a_switch_animates_then_stops_drawing(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(TRACKING, Zone.LG))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL))
     run_ticks(d, clock, ticker, 2.0)
     d.set_view(DockView(TRACKING, Zone.LAPTOP))
     assert ticker.running
@@ -170,15 +170,15 @@ def test_the_open_panel_buttons(dock):
 
 def test_text_changes_redraw_only_while_the_panel_is_open(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(TRACKING, Zone.LG, title="Focus: LG", detail="a"))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL, title="Focus: External", detail="a"))
     run_ticks(d, clock, ticker, 2.0)
     before = d.frames
-    d.set_view(DockView(TRACKING, Zone.LG, title="Focus: LG", detail="b"))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL, title="Focus: External", detail="b"))
     assert d.frames == before
     d._hover.timeout.emit()
     run_ticks(d, clock, ticker, 1.0)
     before = d.frames
-    d.set_view(DockView(TRACKING, Zone.LG, title="Focus: LG", detail="c"))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL, title="Focus: External", detail="c"))
     assert d.frames == before + 1
 
 
@@ -194,19 +194,19 @@ def test_hidden_means_no_grabs_and_no_frames(dock):
 
 def test_the_lid_wakes_the_clock_after_the_hold(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(TRACKING, Zone.LG))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL))
     run_ticks(d, clock, ticker, 2.0)
-    d.set_view(DockView(TRACKING, Zone.LG, last_key_t=clock.t))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL, last_key_t=clock.t))
     run_ticks(d, clock, ticker, 0.25)  # the lid closes (180 ms), then holds
     assert not ticker.running and d._wake.isActive()  # asleep, with the melt's start scheduled
 
 
 def test_slow_animations_are_capped_at_60_fps(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(TRACKING, Zone.LG))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL))
     run_ticks(d, clock, ticker, 2.0)
     key_t = clock.t
-    d.set_view(DockView(TRACKING, Zone.LG, last_key_t=key_t))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL, last_key_t=key_t))
     run_ticks(d, clock, ticker, 0.25)
     clock.t = key_t + 0.4  # past the 0.3 s hold: the lid is melting
     d._kick()
@@ -218,7 +218,7 @@ def test_slow_animations_are_capped_at_60_fps(dock):
 
 def test_paused_shows_resume_and_no_camera(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(PAUSED, Zone.LG, title="Paused"))
+    d.set_view(DockView(PAUSED, Zone.EXTERNAL, title="Paused"))
     c = d._content()
     assert c.pause_label == "Resume" and c.preview is None and c.caption == "camera off"
 
@@ -269,9 +269,9 @@ def ok_result():
     from gazefocus.logic.classifier import fit_zone_model
 
     rng = random.Random(2)
-    lg = [HeadSample(i, True, 30 + rng.gauss(0, 2), rng.gauss(0, 2), 0.0) for i in range(50)]
+    ext = [HeadSample(i, True, 30 + rng.gauss(0, 2), rng.gauss(0, 2), 0.0) for i in range(50)]
     lap = [HeadSample(i, True, rng.gauss(0, 2), rng.gauss(0, 2), 0.0) for i in range(50)]
-    return CalibrationResult(fit_zone_model(lg, lap), {"LG": lg, "LAPTOP": lap}, {"LG": 50, "LAPTOP": 50},
+    return CalibrationResult(fit_zone_model(ext, lap), {"EXTERNAL": ext, "LAPTOP": lap}, {"EXTERNAL": 50, "LAPTOP": 50},
                              "excellent", "Calibrated ✓", "Look at each screen: the water should follow.")
 
 
@@ -410,7 +410,7 @@ def test_closing_the_dock_stops_its_timers_and_reports_the_panel_closed(qapp):
 
 def test_showing_again_redraws_what_changed_while_hidden(dock):
     d, clock, ticker, _ = dock
-    d.set_view(DockView(TRACKING, Zone.LG))
+    d.set_view(DockView(TRACKING, Zone.EXTERNAL))
     run_ticks(d, clock, ticker, 2.0)
     d.set_hidden(True)
     d.set_view(DockView(TRACKING, Zone.LAPTOP))  # changes while hidden: nothing is drawn

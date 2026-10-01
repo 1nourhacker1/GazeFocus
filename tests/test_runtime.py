@@ -16,7 +16,7 @@ from gazefocus.runtime import (
 from gazefocus.types import HeadSample, Zone
 
 FRAME = np.zeros((2, 2, 3), np.uint8)
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_external=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
 
 
 class FakeClock:
@@ -50,9 +50,9 @@ def test_collect_phase_survives_no_frames():
     assert collect_phase(lambda: None, lambda f, t: HeadSample(t, True), 1.0, clock=c.time, sleep=c.sleep) == []
 
 
-def phase_tracker(said, lg_yaw=-32.0, face=True):
+def phase_tracker(said, external_yaw=-32.0, face=True):
     def track(frame, t):
-        return HeadSample(t, face, yaw=lg_yaw if "LG" in said[-1] else -2.0, pitch=0.0)
+        return HeadSample(t, face, yaw=external_yaw if "external monitor" in said[-1] else -2.0, pitch=0.0)
 
     return track
 
@@ -62,13 +62,13 @@ def test_calibrate_fits_and_counts():
     rng = np.random.default_rng(1)
 
     def track(frame, t):
-        base = -32.0 if "LG" in said[-1] else -2.0
+        base = -32.0 if "external monitor" in said[-1] else -2.0
         return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
 
     model, counts = calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append)
-    assert counts["LG"] >= MIN_CAL_SAMPLES and counts["LAPTOP"] >= MIN_CAL_SAMPLES
+    assert counts["EXTERNAL"] >= MIN_CAL_SAMPLES and counts["LAPTOP"] >= MIN_CAL_SAMPLES
     assert model.z(np.array([-32.0, 0, 0])) < -0.5 < 0.5 < model.z(np.array([-2.0, 0, 0]))
-    assert any("LG" in s for s in said) and any("separation" in s for s in said)
+    assert any("external monitor" in s for s in said) and any("separation" in s for s in said)
 
 
 def test_calibrate_rejects_too_few_face_samples():
@@ -79,8 +79,8 @@ def test_calibrate_rejects_too_few_face_samples():
 
 def test_margin_bar():
     assert "o" not in margin_bar(None)
-    assert margin_bar(-2.0).startswith("LG[o") and margin_bar(5.0).endswith("o]LAPTOP")
-    assert margin_bar(0.0) == "LG[----------o----------]LAPTOP"
+    assert margin_bar(-2.0).startswith("EXTERNAL[o") and margin_bar(5.0).endswith("o]LAPTOP")
+    assert margin_bar(0.0) == "EXTERNAL[----------o----------]LAPTOP"
 
 
 def test_watch_loop_switches_and_records(tmp_path):
@@ -92,8 +92,8 @@ def test_watch_loop_switches_and_records(tmp_path):
             lambda: FRAME, track, ZoneClassifier(TOY), GazeDecider(),
             seconds=2.5, clock=c.time, sleep=c.sleep, say=said.append, recorder=rec,
         )
-    assert [d.target for d in out if d.action == "switch"] == [Zone.LG]
-    assert any("SWITCH -> LG" in s for s in said)
+    assert [d.target for d in out if d.action == "switch"] == [Zone.EXTERNAL]
+    assert any("SWITCH -> EXTERNAL" in s for s in said)
     assert len(list(read_recording(rec_path))) == len(out)
 
 
@@ -135,20 +135,20 @@ def test_calibrate_cues_each_phase_before_it_records():
     rng = np.random.default_rng(2)
 
     def track(frame, t):
-        base = -32.0 if "LG" in said[-1] else -2.0
+        base = -32.0 if "external monitor" in said[-1] else -2.0
         return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
 
     first_sample_t = {}
 
     def tracking(frame, t):
-        phase = "LG" if "LG" in said[-1] else "LAPTOP"
+        phase = "EXTERNAL" if "external monitor" in said[-1] else "LAPTOP"
         first_sample_t.setdefault(phase, t)
         return track(frame, t)
 
     calibrate(lambda: FRAME, tracking, clock=c.time, sleep=c.sleep, say=said.append,
               cue=lambda name: cues.append((name, c.time())))
-    assert [n for n, _ in cues] == ["LG", "LAPTOP", "DONE"]
-    assert cues[0][1] < first_sample_t["LG"] and cues[1][1] < first_sample_t["LAPTOP"]
+    assert [n for n, _ in cues] == ["EXTERNAL", "LAPTOP", "DONE"]
+    assert cues[0][1] < first_sample_t["EXTERNAL"] and cues[1][1] < first_sample_t["LAPTOP"]
 
 
 def test_calibrate_hands_back_the_raw_samples():
@@ -156,11 +156,11 @@ def test_calibrate_hands_back_the_raw_samples():
     rng = np.random.default_rng(3)
 
     def track(frame, t):
-        base = -32.0 if "LG" in said[-1] else -2.0
+        base = -32.0 if "external monitor" in said[-1] else -2.0
         return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
 
     calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append, samples_out=samples)
-    assert set(samples) == {"LG", "LAPTOP"} and len(samples["LG"]) >= MIN_CAL_SAMPLES
+    assert set(samples) == {"EXTERNAL", "LAPTOP"} and len(samples["EXTERNAL"]) >= MIN_CAL_SAMPLES
 
 
 def test_calibrate_lead_in_is_configurable():
@@ -168,7 +168,7 @@ def test_calibrate_lead_in_is_configurable():
     rng = np.random.default_rng(4)
 
     def track(frame, t):
-        base = -32.0 if "LG" in said[-1] else -2.0
+        base = -32.0 if "external monitor" in said[-1] else -2.0
         return HeadSample(t, True, yaw=base + rng.normal(0, 2), pitch=rng.normal(0, 2))
 
     calibrate(lambda: FRAME, track, clock=c.time, sleep=c.sleep, say=said.append, seconds=6.0, lead_in_s=0.0)

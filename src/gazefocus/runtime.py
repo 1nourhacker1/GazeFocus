@@ -18,7 +18,7 @@ Track = Callable[[np.ndarray, float], HeadSample]
 
 MIN_CAL_SAMPLES = 40
 CAL_PHASES = (
-    ("LG", "Look at the LG (turn toward where it sits) and let your eyes wander over all of it"),
+    ("EXTERNAL", "Look at the external monitor (turn toward where it sits) and let your eyes wander over all of it"),
     ("LAPTOP", "Now look at the LAPTOP screen and let your eyes wander over all of it"),
 )
 
@@ -73,10 +73,10 @@ def calibrate(
     counts = {k: sum(s.face for s in v) for k, v in collected.items()}
     if min(counts.values()) < MIN_CAL_SAMPLES:
         raise ValueError(
-            f"too few face samples (LG={counts['LG']}, LAPTOP={counts['LAPTOP']}; need {MIN_CAL_SAMPLES} each). "
+            f"too few face samples (EXTERNAL={counts['EXTERNAL']}, LAPTOP={counts['LAPTOP']}; need {MIN_CAL_SAMPLES} each). "
             "Is the room too dark, or were you out of view?"
         )
-    model = fit_zone_model(collected["LG"], collected["LAPTOP"])
+    model = fit_zone_model(collected["EXTERNAL"], collected["LAPTOP"])
     say(f"separation {model.separation:.1f} sigma ({quality(model.separation)})")
     return model, counts
 
@@ -86,7 +86,7 @@ def margin_bar(margin: float | None, width: int = 21) -> str:
     if margin is not None:
         pos = round((max(-2.0, min(2.0, margin)) + 2.0) / 4.0 * (width - 1))
         cells[pos] = "o"
-    return "LG[" + "".join(cells) + "]LAPTOP"
+    return "EXTERNAL[" + "".join(cells) + "]LAPTOP"
 
 
 def format_status(d: Decision, focus: Zone) -> str:

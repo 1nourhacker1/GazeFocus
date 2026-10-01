@@ -30,7 +30,7 @@ def layout_fingerprint(monitors: Sequence[MonitorInfo]) -> str:
 def zone_monitors(monitors: Sequence[MonitorInfo], laptop: str = "primary") -> dict[str, str | None]:
     lap = next((m for m in monitors if (m.primary if laptop == "primary" else m.device == laptop)), None)
     others = [m for m in monitors if m is not lap]
-    return {"LAPTOP": lap.id if lap else None, "LG": others[0].id if len(others) == 1 else None}
+    return {"LAPTOP": lap.id if lap else None, "EXTERNAL": others[0].id if len(others) == 1 else None}
 
 
 def ensure_dpi_awareness() -> None:

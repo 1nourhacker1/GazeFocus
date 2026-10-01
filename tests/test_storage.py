@@ -12,7 +12,7 @@ from gazefocus.storage import (
 from gazefocus.win.monitors import MonitorInfo
 
 LAP = MonitorInfo(r"\\.\DISPLAY1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True)
-MODEL = ZoneModel(w=(-0.06, 0.02, 0.4), b=0.9, separation=6.5, mean_lg=(32, 7, 0.2), mean_laptop=(-2, 12, 0.0), sd=(5.0, 4.0, 0.1))
+MODEL = ZoneModel(w=(-0.06, 0.02, 0.4), b=0.9, separation=6.5, mean_external=(32, 7, 0.2), mean_laptop=(-2, 12, 0.0), sd=(5.0, 4.0, 0.1))
 
 
 def cal(fp="abc123"):
@@ -20,10 +20,10 @@ def cal(fp="abc123"):
         created=now_iso(),
         layout_fingerprint=fp,
         monitors=(LAP,),
-        zone_monitors={"LAPTOP": "id-lap", "LG": None},
+        zone_monitors={"LAPTOP": "id-lap", "EXTERNAL": None},
         camera={"index": 0, "width": 640, "height": 480, "backend": "MSMF"},
         model=MODEL,
-        samples={"LG": 72, "LAPTOP": 75},
+        samples={"EXTERNAL": 72, "LAPTOP": 75},
     )
 
 

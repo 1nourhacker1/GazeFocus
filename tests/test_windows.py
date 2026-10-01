@@ -13,10 +13,10 @@ from gazefocus.win.windows import (
     window_facts,
 )
 
-LG, LAP = r"\\.\DISPLAY5", r"\\.\DISPLAY1"
+EXTERNAL, LAP = r"\\.\DISPLAY5", r"\\.\DISPLAY1"
 
 
-def good(hwnd, device=LG, **kw):
+def good(hwnd, device=EXTERNAL, **kw):
     fields = {"exists": True, "visible": True, "class_name": "Chrome_WidgetWin_1", "device": device, **kw}
     return WindowFacts(hwnd=hwnd, **fields)
 
@@ -46,17 +46,17 @@ def test_a_normal_window_is_a_target():
 
 def test_choose_prefers_most_recent_valid_window_on_the_monitor():
     table = {1: good(1, device=LAP), 2: good(2, minimized=True), 3: good(3), 4: good(4)}
-    assert choose_target(LG, [1, 2, 3, 4], table.__getitem__, lambda: []) == 3
+    assert choose_target(EXTERNAL, [1, 2, 3, 4], table.__getitem__, lambda: []) == 3
 
 
 def test_choose_falls_back_to_zorder_when_mru_has_nothing():  # Review Focus #3: MRU window closed
     table = {9: WindowFacts(9, exists=False), 5: good(5, device=LAP), 6: good(6)}
-    assert choose_target(LG, [9], table.__getitem__, lambda: [5, 6]) == 6
+    assert choose_target(EXTERNAL, [9], table.__getitem__, lambda: [5, 6]) == 6
 
 
 def test_choose_returns_none_for_an_empty_monitor():
     table = {5: good(5, device=LAP)}
-    assert choose_target(LG, [], table.__getitem__, lambda: [5]) is None
+    assert choose_target(EXTERNAL, [], table.__getitem__, lambda: [5]) is None
 
 
 def test_live_desktop_has_windows_and_our_window_is_never_a_target():
@@ -100,7 +100,7 @@ def test_a_borderless_window_over_the_monitor_is_fullscreen():
     [
         (good(7, device=LAP), (-8, -8, 2568, 1608), True),  # maximized, with an auto-hiding taskbar
         (good(7, device=LAP), (100, 100, 900, 700), False),  # an ordinary window
-        (good(7, device=LG), (0, 0, 2560, 1600), False),  # on the other monitor
+        (good(7, device=EXTERNAL), (0, 0, 2560, 1600), False),  # on the other monitor
         (WindowFacts(7, True, visible=True, class_name="Progman", device=LAP), (0, 0, 2560, 1600), False),  # desktop
         (good(7, device=LAP, own_process=True), (0, 0, 2560, 1600), False),  # the dock itself
     ],
@@ -116,10 +116,10 @@ def z_desktop(*windows):
                 rect_of=lambda h: table[h][1], zoomed_of=lambda h: table[h][2])
 
 
-def test_a_fullscreen_video_on_the_laptop_counts_while_focus_is_on_the_lg():
-    """GazeFocus itself moves focus to the LG: the laptop's fullscreen video is then not the foreground."""
+def test_a_fullscreen_video_on_the_laptop_counts_while_focus_is_on_the_external():
+    """GazeFocus itself moves focus to the external monitor: the laptop's fullscreen video is then not the foreground."""
     fake = z_desktop(
-        (1, good(1, device=LG), (-1920, -302, 0, 778), False),  # the focused LG window (topmost overall)
+        (1, good(1, device=EXTERNAL), (-1920, -302, 0, 778), False),  # the focused EXTERNAL window (topmost overall)
         (2, good(2, device=LAP), (0, 0, 2560, 1600), False),  # the fullscreen video on the laptop
     )
     assert fullscreen_app_on(LAP, MON, **fake)
@@ -132,4 +132,4 @@ def test_the_topmost_real_window_on_the_monitor_decides():
     assert fullscreen_app_on(LAP, MON, **z_desktop((3, tool, (10, 10, 50, 50), False), (4, ours, (0, 0, 332, 178), False), video))
     editor = (5, good(5, device=LAP), (100, 100, 1500, 900), False)  # a normal window over the video
     assert not fullscreen_app_on(LAP, MON, **z_desktop(editor, video))
-    assert not fullscreen_app_on(LAP, MON, **z_desktop((1, good(1, device=LG), (-1920, -302, 0, 778), False)))
+    assert not fullscreen_app_on(LAP, MON, **z_desktop((1, good(1, device=EXTERNAL), (-1920, -302, 0, 778), False)))

@@ -21,7 +21,7 @@ class DeciderCfg:
 class ClassifierCfg:
     ema_alpha: float = 0.35
     dead_band: float = 0.25
-    face_lost_lg_margin: float = -1.2
+    face_lost_external_margin: float = -1.2
     face_lost_memory_s: float = 0.3
     ood_sigma: float = 3.5
 
@@ -86,7 +86,7 @@ RULES = {
     "classifier": {
         "ema_alpha": _num(0.0, 1.0, lo_open=True, desc="a number in (0, 1]"),
         "dead_band": _num(0.0, 0.99),
-        "face_lost_lg_margin": _num(-5.0, 0.0),
+        "face_lost_external_margin": _num(-5.0, 0.0),
         "face_lost_memory_s": _num(0.0, 5.0),
         "ood_sigma": _num(1.0, 20.0),
     },

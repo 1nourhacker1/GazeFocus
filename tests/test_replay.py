@@ -5,7 +5,7 @@ from gazefocus.logic.decider import Context
 from gazefocus.replay import Recorder, read_recording, replay, summarize
 from gazefocus.types import HeadSample, Zone
 
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_external=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
 
 
 def frames(segments, focus=Zone.LAPTOP, **ctx_kw):
@@ -38,14 +38,14 @@ def test_bad_line_reports_line_number(tmp_path):
 def test_replay_simulates_switches_both_ways():
     decisions = replay(frames([(1.0, 0.0), (1.0, -30.0), (1.2, 0.0)]), TOY)
     switches = [d for d in decisions if d.action == "switch"]
-    assert [d.target for d in switches] == [Zone.LG, Zone.LAPTOP]
+    assert [d.target for d in switches] == [Zone.EXTERNAL, Zone.LAPTOP]
     assert 1.5 <= switches[0].t <= 1.8
 
 
 def test_recorded_manual_focus_change_overrides_simulation():
     data = frames([(0.5, 0.0)])
     t0 = len(data) / 15
-    later = frames([(1.5, 0.0)], focus=Zone.LG, last_manual_focus_t=t0)
+    later = frames([(1.5, 0.0)], focus=Zone.EXTERNAL, last_manual_focus_t=t0)
     later = [(HeadSample(s.t + t0, s.face, s.yaw), Context(t=c.t + t0, focus_zone=c.focus_zone,
              last_manual_focus_t=c.last_manual_focus_t)) for s, c in later]
     decisions = replay(data + later, TOY)
@@ -57,7 +57,7 @@ def test_summarize_collapses_typing_runs():
     decisions = replay(frames([(0.3, 0.0), (1.5, -30.0)], last_key_t=0.0), TOY)
     lines = summarize(decisions)
     assert sum("typing" in line for line in lines) == 1
-    assert any("SWITCH" in line and "LG" in line for line in lines)
+    assert any("SWITCH" in line and "EXTERNAL" in line for line in lines)
 
 
 def test_replay_ignores_the_recorded_simulated_switches_of_another_model():
@@ -66,7 +66,7 @@ def test_replay_ignores_the_recorded_simulated_switches_of_another_model():
     data = []
     for i in range(60):  # 4 s of steady laptop gaze...
         t = i / 15
-        recorded_focus = Zone.LG if 1.0 <= t < 3.0 else Zone.LAPTOP  # ...but model A had "switched" to LG
+        recorded_focus = Zone.EXTERNAL if 1.0 <= t < 3.0 else Zone.LAPTOP  # ...but model A had "switched" to EXTERNAL
         data.append((HeadSample(t, True, yaw=0.0), Context(t=t, focus_zone=recorded_focus)))
     decisions = replay(data, TOY)
     assert [d for d in decisions if d.action == "switch"] == []

@@ -13,7 +13,7 @@ from typing import Callable
 from gazefocus.dock.view import ALERT, PAUSED, TRACKING, DockView
 from gazefocus.types import Zone
 
-LG, LAP = Zone.LG, Zone.LAPTOP
+EXTERNAL, LAP = Zone.EXTERNAL, Zone.LAPTOP
 CYCLE_S = 32.0
 KEYS = [6.0 + 0.15 * i for i in range(14)]  # typing from 6.0 s to 8.0 s, a key every 150 ms
 
@@ -24,7 +24,7 @@ def _t(zone, title, **kw) -> Callable[[float], DockView]:
 
 # (offset in the cycle, what to print, the view at that moment given `now`)
 STEPS: list[tuple[float, str | None, Callable[[float], DockView]]] = [
-    (0.0, "Tracking: focus on the LG (the bigger tile holds the water)", _t(LG, "Focus: LG")),
+    (0.0, "Tracking: focus on the external monitor (the bigger tile holds the water)", _t(EXTERNAL, "Focus: External")),
     (3.0, "Switch: the water flows to the laptop", _t(LAP, "Focus: Laptop")),
     *[(k, "Typing: amber water under a lid" if i == 0 else None,
        lambda now: DockView(TRACKING, LAP, last_key_t=now, title="Frozen while typing"))
@@ -40,7 +40,7 @@ STEPS: list[tuple[float, str | None, Callable[[float], DockView]]] = [
     (23.0, "Resumed", _t(LAP, "Focus: Laptop")),
     (26.0, "Camera unavailable: empty tiles and a '!'", lambda now: DockView(
         ALERT, LAP, title="Camera unavailable", detail="details in the tray")),
-    (29.0, "Back to tracking (the cycle repeats every 32 s)", _t(LG, "Focus: LG")),
+    (29.0, "Back to tracking (the cycle repeats every 32 s)", _t(EXTERNAL, "Focus: External")),
 ]
 
 

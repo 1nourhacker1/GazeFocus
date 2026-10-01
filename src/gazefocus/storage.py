@@ -20,10 +20,10 @@ class Calibration:
     created: str
     layout_fingerprint: str
     monitors: tuple[MonitorInfo, ...]
-    zone_monitors: dict  # {"LAPTOP": id | None, "LG": id | None}
+    zone_monitors: dict  # {"LAPTOP": id | None, "EXTERNAL": id | None}
     camera: dict  # {"index", "width", "height", "backend"}
     model: ZoneModel
-    samples: dict  # {"LG": n, "LAPTOP": n}
+    samples: dict  # {"EXTERNAL": n, "LAPTOP": n}
     version: int = VERSION
 
 
@@ -64,7 +64,7 @@ def load_calibration(path: Path) -> tuple[Calibration | None, str | None]:
         )
         model = ZoneModel.from_dict(d["model"])
         values = (*model.w, model.b, model.separation, *model.sd)
-        sizes = {len(model.w), len(model.sd), len(model.mean_lg), len(model.mean_laptop)}
+        sizes = {len(model.w), len(model.sd), len(model.mean_external), len(model.mean_laptop)}
         if sizes != {len(FEATURES)} or not all(math.isfinite(v) for v in values) or min(model.sd) <= 0:
             raise ValueError("model has non-finite or wrong-sized weights")
         return (

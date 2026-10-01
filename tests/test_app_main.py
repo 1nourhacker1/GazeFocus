@@ -18,8 +18,8 @@ from gazefocus.win.monitors import MonitorInfo
 from gazefocus.win.rawinput import VK_ESCAPE, RawEvent
 
 LAP = MonitorInfo(r"\\.\FAKE1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True)
-LG = MonitorInfo(r"\\.\FAKE5", "id-lg", (-1920, -302, 0, 778), (-1920, -302, 0, 738), False)
-MODEL = ZoneModel(w=(-1 / 15, 0.0, 0.0), b=1.0, separation=9.0, mean_lg=(30, 10, 0), mean_laptop=(0, 10, 0), sd=(3.0, 5.0, 0.1))
+EXTERNAL = MonitorInfo(r"\\.\FAKE5", "id-ext", (-1920, -302, 0, 778), (-1920, -302, 0, 738), False)
+MODEL = ZoneModel(w=(-1 / 15, 0.0, 0.0), b=1.0, separation=9.0, mean_external=(30, 10, 0), mean_laptop=(0, 10, 0), sd=(3.0, 5.0, 0.1))
 FRAME = np.zeros((2, 2, 3), np.uint8)
 TEST_HOTKEY = "Ctrl+Alt+Shift+F24"  # tests never register the real Ctrl+Alt+G
 
@@ -144,7 +144,7 @@ class FakeRun:
         self.on_done(result)
 
 
-def cal_result(lg_yaw=30.0, lap_yaw=0.0):
+def cal_result(external_yaw=30.0, lap_yaw=0.0):
     """A finished run's result: 60 face samples per screen."""
     import random
 
@@ -152,18 +152,18 @@ def cal_result(lg_yaw=30.0, lap_yaw=0.0):
     from gazefocus.logic.classifier import fit_zone_model, quality
 
     rng = random.Random(7)
-    lg = [HeadSample(i, True, lg_yaw + rng.gauss(0, 2), 10 + rng.gauss(0, 2), 0.0) for i in range(60)]
+    ext = [HeadSample(i, True, external_yaw + rng.gauss(0, 2), 10 + rng.gauss(0, 2), 0.0) for i in range(60)]
     lap = [HeadSample(i, True, lap_yaw + rng.gauss(0, 2), 10 + rng.gauss(0, 2), 0.0) for i in range(60)]
-    m = fit_zone_model(lg, lap)
+    m = fit_zone_model(ext, lap)
     q = quality(m.separation)
-    return CalibrationResult(m, {"LG": lg, "LAPTOP": lap}, {"LG": 60, "LAPTOP": 60}, q,
+    return CalibrationResult(m, {"EXTERNAL": ext, "LAPTOP": lap}, {"EXTERNAL": 60, "LAPTOP": 60}, q,
                              "Calibrated ✓" if q != "too close" else "Too close", "")
 
 
 class FakeDesktop:
     def __init__(self):
         self.fg, self.brought = 1, []
-        self.devices = {1: LAP.device, 11: LG.device}
+        self.devices = {1: LAP.device, 11: EXTERNAL.device}
 
     def __call__(self, work_area):
         return Desktop(
@@ -215,7 +215,7 @@ def rig(qapp):
     app = GazeFocusApp(
         Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY)), open_camera=open_camera, make_tracker=FakeTracker, beep=beeps.append, qapp=qapp,
         log=log, dlog=logging.getLogger("test.app.decisions"), desktop_factory=desktop,
-        monitors=lambda: [LAP, LG],
+        monitors=lambda: [LAP, EXTERNAL],
         dock_factory=lambda cfg, **cb: docks.append(FakeDock(cfg, **cb)) or docks[-1],
         screen_work=lambda m: m.work, fullscreen_on=lambda device, rect: state["fullscreen"],
         screen_rect=rect_of, run_factory=FakeRun, first_run=False,
@@ -231,7 +231,7 @@ def rect_of(m):
 
 
 def calibrate_fake():
-    commit_calibration(MODEL, {"LG": 60, "LAPTOP": 60}, None, monitors=[LAP, LG], dock_monitor="primary", camera={})
+    commit_calibration(MODEL, {"EXTERNAL": 60, "LAPTOP": 60}, None, monitors=[LAP, EXTERNAL], dock_monitor="primary", camera={})
 
 
 def test_uncalibrated_app_keeps_the_camera_off(rig):
@@ -245,9 +245,9 @@ def test_calibrated_app_tracks_and_switches(rig, qapp):
     app.refresh_layout()
     app.apply()
     assert app.state.status is Status.RUNNING and app.worker.running
-    FakeTracker.yaw = 30.0  # look at the LG
+    FakeTracker.yaw = 30.0  # look at the external monitor
     assert wait_until(qapp, lambda: desktop.brought == [11])
-    assert "focus on LG" in app.tray.icon.toolTip() or app.tray.icon.toolTip().startswith("GazeFocus: running")
+    assert "focus on EXTERNAL" in app.tray.icon.toolTip() or app.tray.icon.toolTip().startswith("GazeFocus: running")
 
 
 def test_pause_releases_the_camera_and_resume_reopens_it(rig, qapp):
@@ -291,11 +291,11 @@ def test_busy_camera_waits_and_retries(rig, qapp):
 def test_a_changed_layout_stops_switching(rig):
     app, _, _, _, _ = rig
     calibrate_fake()
-    app._monitors_fn = lambda: [LAP]  # the LG was unplugged
+    app._monitors_fn = lambda: [LAP]  # the external monitor was unplugged
     app.refresh_layout()
     app.apply()
     assert app.state.status is Status.UNSUPPORTED and not app.worker.running
-    moved = MonitorInfo(LG.device, LG.id, (2560, 0, 4480, 1080), (2560, 0, 4480, 1040), False)
+    moved = MonitorInfo(EXTERNAL.device, EXTERNAL.id, (2560, 0, 4480, 1080), (2560, 0, 4480, 1040), False)
     app._monitors_fn = lambda: [LAP, moved]  # plugged back in somewhere else
     app.refresh_layout()
     assert app.state.status is Status.LAYOUT_CHANGED
@@ -324,8 +324,8 @@ def test_recalibrate_opens_the_intro_and_start_runs_on_the_tracking_camera(rig, 
     app, dock, run = start_run(rig, qapp)
     assert dock.modal is None and run.started and dock.raised == 1  # the dock is lifted above the overlay
     assert app.state.status is Status.CALIBRATING and app.worker.running
-    assert run.screens == {"LG": rect_of(LG), "LAPTOP": rect_of(LAP)} and run.dock_point == (1280.0, 30.0)
-    FakeTracker.yaw = 30.0  # looking at the LG must not switch focus while calibrating
+    assert run.screens == {"EXTERNAL": rect_of(EXTERNAL), "LAPTOP": rect_of(LAP)} and run.dock_point == (1280.0, 30.0)
+    FakeTracker.yaw = 30.0  # looking at the external monitor must not switch focus while calibrating
     assert wait_until(qapp, lambda: len(run.samples) >= 5)
     assert desktop.brought == []
 
@@ -357,8 +357,8 @@ def test_save_commits_the_result_and_tracking_resumes(rig, qapp):
     from gazefocus.storage import load_if_matches
     from gazefocus.win.monitors import layout_fingerprint
 
-    cal, _ = load_if_matches(calibration_path(), layout_fingerprint([LAP, LG]))
-    assert cal.camera["backend"] == "FAKE" and abs(cal.model.mean_lg[0] - 28.0) < 1.5
+    cal, _ = load_if_matches(calibration_path(), layout_fingerprint([LAP, EXTERNAL]))
+    assert cal.camera["backend"] == "FAKE" and abs(cal.model.mean_external[0] - 28.0) < 1.5
 
 
 def test_the_result_panel_shows_the_new_model_live_without_switching(rig, qapp):
@@ -367,7 +367,7 @@ def test_the_result_panel_shows_the_new_model_live_without_switching(rig, qapp):
     run.finish(cal_result())
     app._on_sample(HeadSample(time.perf_counter(), True, yaw=30.0, pitch=10.0))
     app._on_sample(HeadSample(time.perf_counter(), True, yaw=30.0, pitch=10.0))
-    assert dock.views[-1].mode == "tracking" and dock.views[-1].focus is Zone.LG  # the water follows the new model
+    assert dock.views[-1].mode == "tracking" and dock.views[-1].focus is Zone.EXTERNAL  # the water follows the new model
     assert desktop.brought == []
 
 
@@ -432,7 +432,7 @@ def test_recalibrate_is_refused_without_two_monitors(rig):
     app, _, cams, beeps, state = rig
     calibrate_fake()
     before = calibration_path().read_text()
-    app._monitors_fn = lambda: [LAP]  # the LG was unplugged
+    app._monitors_fn = lambda: [LAP]  # the external monitor was unplugged
     app.refresh_layout()
     app.apply()
     app.recalibrate()
@@ -444,7 +444,7 @@ def test_a_layout_change_mid_run_cancels_it(rig, qapp):
     app = running_app(rig)
     before = calibration_path().read_text()
     app, dock, run = start_run(rig, qapp)
-    app._monitors_fn = lambda: [LAP]  # the LG is unplugged mid-run
+    app._monitors_fn = lambda: [LAP]  # the external monitor is unplugged mid-run
     app._relayout()
     assert run.cancelled and not app.state.calibrating
     assert calibration_path().read_text() == before
@@ -455,8 +455,8 @@ def test_a_layout_change_before_save_keeps_the_old_calibration(rig, qapp):
     before = calibration_path().read_text()
     app, dock, run = start_run(rig, qapp)
     run.finish(cal_result())
-    moved = MonitorInfo(LG.device, LG.id, (2560, 0, 4480, 1080), (2560, 0, 4480, 1040), False)
-    app._monitors_fn = lambda: [LAP, moved]  # the LG moved before Save
+    moved = MonitorInfo(EXTERNAL.device, EXTERNAL.id, (2560, 0, 4480, 1080), (2560, 0, 4480, 1040), False)
+    app._monitors_fn = lambda: [LAP, moved]  # the external monitor moved before Save
     dock.press("save")
     assert calibration_path().read_text() == before and not app.state.calibrating
 
@@ -481,7 +481,7 @@ def test_first_run_opens_the_intro(qapp):
     app = GazeFocusApp(
         Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY)), open_camera=lambda: None, make_tracker=FakeTracker,
         beep=lambda n: None, qapp=qapp, log=logging.getLogger("test.app"),
-        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, LG],
+        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, EXTERNAL],
         dock_factory=lambda cfg, **cb: docks.append(FakeDock(cfg, **cb)) or docks[-1], screen_work=lambda m: m.work,
         fullscreen_on=lambda d, r: False, screen_rect=rect_of, run_factory=FakeRun,
     )
@@ -498,7 +498,7 @@ def test_without_a_dock_the_run_starts_at_once_and_a_good_result_is_saved(qapp):
     app = GazeFocusApp(
         Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY), dock=DockCfg(enabled=False)), open_camera=lambda: None,
         make_tracker=FakeTracker, beep=lambda n: None, qapp=qapp, log=logging.getLogger("test.app"),
-        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, LG],
+        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, EXTERNAL],
         dock_factory=None, screen_work=lambda m: m.work, fullscreen_on=lambda d, r: False,
         screen_rect=rect_of, run_factory=FakeRun, first_run=False,
     )
@@ -599,7 +599,7 @@ def test_a_disabled_dock_is_never_created(qapp):
     app = GazeFocusApp(
         Config(hotkey=HotkeyCfg(pause=TEST_HOTKEY), dock=DockCfg(enabled=False)), open_camera=lambda: None,
         make_tracker=FakeTracker, beep=lambda n: None, qapp=qapp, log=logging.getLogger("test.app"),
-        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, LG],
+        dlog=logging.getLogger("test.app.decisions"), desktop_factory=FakeDesktop(), monitors=lambda: [LAP, EXTERNAL],
         dock_factory=lambda cfg, **cb: made.append(cfg), screen_work=lambda m: m.work,
         fullscreen_on=lambda d, r: False,
     )
@@ -658,7 +658,7 @@ def test_a_dock_rebuilt_with_its_panel_open_turns_the_preview_off(rig):
 def test_redo_with_a_monitor_gone_ends_the_calibration(rig, qapp):
     app, dock, run = start_run(rig, qapp)
     run.finish(cal_result())
-    app._monitors_fn = lambda: [LAP]  # the LG drops out while the result shows
+    app._monitors_fn = lambda: [LAP]  # the external monitor drops out while the result shows
     dock.press("redo")
     assert not app.state.calibrating and dock.modal is None
     app._set("paused", True)

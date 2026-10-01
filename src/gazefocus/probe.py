@@ -14,8 +14,8 @@ from gazefocus.types import HeadSample
 
 PHASES = (
     ("LAPTOP", "Look at the middle of the LAPTOP screen", 5.0),
-    ("LG", "Turn to where the LG normally sits and look at its middle", 5.0),
-    ("PAST_LG", "Keep turning left, past the LG, as far as is comfortable", 4.0),
+    ("EXTERNAL", "Turn to where the external monitor normally sits and look at its middle", 5.0),
+    ("PAST_EXTERNAL", "Keep turning past the external monitor, as far as is comfortable", 4.0),
 )
 
 
@@ -107,11 +107,11 @@ def format_report(stats: list[PhaseStats], cpu_total_pct: float, backend: str | 
             f"{_f(s.pitch_mean)} | {_f(s.iris_h_mean, '{:.2f}')} | {_f(s.ms_p50)} | {_f(s.ms_p95)} |"
         )
     by = {s.name: s for s in stats}
-    lap, lg = by.get("LAPTOP"), by.get("LG")
-    if lap and lg and lap.yaw_mean is not None and lg.yaw_mean is not None:
-        delta = lg.yaw_mean - lap.yaw_mean
+    lap, ext = by.get("LAPTOP"), by.get("EXTERNAL")
+    if lap and ext and lap.yaw_mean is not None and ext.yaw_mean is not None:
+        delta = ext.yaw_mean - lap.yaw_mean
         sign = "NEGATIVE" if delta < 0 else "POSITIVE"
-        lines += ["", f"Turning toward the LG makes yaw {sign} (LG - LAPTOP = {delta:+.1f} deg)."]
+        lines += ["", f"Turning toward the external monitor makes yaw {sign} (EXTERNAL - LAPTOP = {delta:+.1f} deg)."]
     return "\n".join(lines)
 
 

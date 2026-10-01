@@ -6,7 +6,7 @@ from gazefocus.viewer import arrow_tip, facing_label, mirror_px, render
 
 
 def test_facing_label_thresholds():
-    assert facing_label(20.0) == "LEFT (LG side)"
+    assert facing_label(20.0) == "LEFT"
     assert facing_label(-20.0) == "RIGHT"
     assert facing_label(5.0) == "CENTER (laptop)"
     assert facing_label(12.0) == "CENTER (laptop)"  # boundary stays centre
@@ -19,7 +19,7 @@ def test_mirror_px():
 def test_arrow_points_where_you_look_in_the_mirrored_view():
     nose = (320, 240)
     assert arrow_tip(nose, 0.0, 0.0) == nose
-    left = arrow_tip(nose, 30.0, 0.0)  # yaw + = turned toward the LG (your left)
+    left = arrow_tip(nose, 30.0, 0.0)  # yaw + = turned toward the external monitor (your left)
     assert left[0] < nose[0] and left[1] == nose[1]
     down = arrow_tip(nose, 0.0, 20.0)  # pitch + = looking down
     assert down[1] > nose[1]

@@ -45,7 +45,7 @@ def test_no_preview_shows_the_dark_placeholder(qapp):
 
 def test_the_preview_is_mirrored(qapp):
     frame = camera((0, 0, 255), (255, 0, 0))  # red on the camera's left, blue on its right (BGR)
-    img = render(PanelContent("Focus: LG", "", "Pause", preview=preview_image(frame)))
+    img = render(PanelContent("Focus: External", "", "Pause", preview=preview_image(frame)))
     left = at(img, PREVIEW.left() + 20, PREVIEW.center().y())
     right = at(img, PREVIEW.right() - 20, PREVIEW.center().y())
     assert left[2] > 200 and left[0] < 60  # blue shows on the left: a mirror
@@ -54,7 +54,7 @@ def test_the_preview_is_mirrored(qapp):
 
 def test_the_face_box_is_drawn_mirrored_in_green(qapp):
     frame = camera((0, 0, 0), (0, 0, 0))
-    content = PanelContent("Focus: LG", "", "Pause", preview=preview_image(frame), face_box=(0.1, 0.2, 0.4, 0.8))
+    content = PanelContent("Focus: External", "", "Pause", preview=preview_image(frame), face_box=(0.1, 0.2, 0.4, 0.8))
     img = render(content)
     greens = [at(img, x, PREVIEW.center().y()) for x in np.arange(PREVIEW.left(), PREVIEW.right(), 0.5)]
     xs = [PREVIEW.left() + i * 0.5 for i, c in enumerate(greens) if c[1] > 120 and c[0] < 120]
@@ -62,7 +62,7 @@ def test_the_face_box_is_drawn_mirrored_in_green(qapp):
 
 
 def test_a_transparent_panel_draws_nothing(qapp):
-    img = render(PanelContent("Focus: LG", "x", "Pause"), opacity=0.0)
+    img = render(PanelContent("Focus: External", "x", "Pause"), opacity=0.0)
     assert all(at(img, x, y)[3] == 0 for x in (30, 150, 250) for y in (60, 130))
 
 

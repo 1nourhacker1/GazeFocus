@@ -11,7 +11,7 @@ from gazefocus.win import camera_usage
 from gazefocus.win.camera_usage import CameraUser
 from gazefocus.win.monitors import MonitorInfo
 
-TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_lg=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
+TOY = ZoneModel(w=(1 / 15, 0.0, 0.0), b=1.0, separation=5.0, mean_external=(-30, 0, 0), mean_laptop=(0, 0, 0), sd=(10.0, 5.0, 0.1))
 
 
 def test_help_lists_commands(capsys):
@@ -42,7 +42,7 @@ def test_watch_without_calibration_exits_3(capsys):
 def save_toy_calibration():
     lap = MonitorInfo(r"\\.\DISPLAY1", "id-lap", (0, 0, 2560, 1600), (0, 0, 2560, 1552), True)
     save_calibration(
-        Calibration(now_iso(), "fp", (lap,), {"LAPTOP": "id-lap", "LG": None}, {"index": 0}, TOY, {"LG": 60, "LAPTOP": 60}),
+        Calibration(now_iso(), "fp", (lap,), {"LAPTOP": "id-lap", "EXTERNAL": None}, {"index": 0}, TOY, {"EXTERNAL": 60, "LAPTOP": 60}),
         calibration_path(),
     )
 
@@ -78,15 +78,15 @@ from types import SimpleNamespace
 
 import gazefocus.__main__ as cli
 
-CLOSE = ZoneModel(w=(0.1, 0.0, 0.0), b=0.0, separation=1.2, mean_lg=(5, 8, 0), mean_laptop=(0, 8, 0), sd=(4.0, 4.0, 0.1))
-GOOD = ZoneModel(w=(-0.07, 0.0, 0.0), b=0.9, separation=12.0, mean_lg=(28, 3, 0.2), mean_laptop=(-1, 9, 0), sd=(2.0, 1.0, 0.1))
+CLOSE = ZoneModel(w=(0.1, 0.0, 0.0), b=0.0, separation=1.2, mean_external=(5, 8, 0), mean_laptop=(0, 8, 0), sd=(4.0, 4.0, 0.1))
+GOOD = ZoneModel(w=(-0.07, 0.0, 0.0), b=0.9, separation=12.0, mean_external=(28, 3, 0.2), mean_laptop=(-1, 9, 0), sd=(2.0, 1.0, 0.1))
 
 
 def fake_calibration_run(monkeypatch, model):
     cam = SimpleNamespace(backend="MSMF", read=lambda: None, release=lambda: None)
     monkeypatch.setattr(cli, "_open_camera", lambda cfg: cam)
     monkeypatch.setattr(cli, "_tracker", lambda: SimpleNamespace(process=None, close=lambda: None))
-    monkeypatch.setattr("gazefocus.runtime.calibrate", lambda *a, **k: (model, {"LG": 60, "LAPTOP": 60}))
+    monkeypatch.setattr("gazefocus.runtime.calibrate", lambda *a, **k: (model, {"EXTERNAL": 60, "LAPTOP": 60}))
 
 
 def test_too_close_calibration_keeps_the_previous_one(monkeypatch, capsys):
@@ -141,7 +141,7 @@ def test_diag_windows_survives_unicode_titles_on_a_cp1252_console(monkeypatch): 
 
 def test_diag_focus_with_no_window_on_that_screen(monkeypatch, capsys):
     monkeypatch.setattr(win_windows, "choose_target", lambda *a, **k: None)
-    assert main(["diag", "focus", "LG", "--delay", "0"]) == 1
+    assert main(["diag", "focus", "EXTERNAL", "--delay", "0"]) == 1
     assert "no window" in capsys.readouterr().out
 
 

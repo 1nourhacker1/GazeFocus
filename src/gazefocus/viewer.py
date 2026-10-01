@@ -17,7 +17,7 @@ SIDE_DEG = 12.0
 
 def facing_label(yaw: float) -> str:
     if yaw > SIDE_DEG:
-        return "LEFT (LG side)"
+        return "LEFT"
     if yaw < -SIDE_DEG:
         return "RIGHT"
     return "CENTER (laptop)"

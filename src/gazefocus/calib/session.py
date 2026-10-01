@@ -19,17 +19,17 @@ from gazefocus.types import HeadSample
 
 PHASES = (
     ("start", 0.42),  # the intro panel has closed
-    ("lg_travel", 1.1),
-    ("lg_card", 1.3),
-    ("lg_tour", 5.2),
+    ("external_travel", 1.1),
+    ("external_card", 1.3),
+    ("external_tour", 5.2),
     ("lap_travel", 1.1),
     ("lap_card", 1.2),
     ("lap_tour", 5.2),
     ("return", 0.7),  # back to the dock
     ("outro", 0.6),  # the drop and the dims fade out
 )
-TOURS = {"lg_tour": "LG", "lap_tour": "LAPTOP"}
-CUES = {"lg_travel": "LG", "lap_travel": "LAPTOP", "done": "DONE"}  # beeps: the user may be looking elsewhere
+TOURS = {"external_tour": "EXTERNAL", "lap_tour": "LAPTOP"}
+CUES = {"external_travel": "EXTERNAL", "lap_travel": "LAPTOP", "done": "DONE"}  # beeps: the user may be looking elsewhere
 SETTLE_S = 0.4  # a tour's first samples are the eyes catching up with the drop
 LOST_CARD_S = 0.3  # without a face this long, the card says so
 STALE_S = 1.0  # no sample for this long counts as no face (a camera that stopped)
@@ -37,17 +37,17 @@ GIVE_UP_S = 20.0  # a tour waiting this long for a face ends the run (a busy cam
 FADE_S = 0.25
 FRAME_60 = 1 / 60  # stretch is measured over one of the mockup's 60 Hz frames
 DIM_ON, DIM_OFF = 0.25, 0.62  # the screen to look at, the other one
-TOO_CLOSE = "Turn your head a little more, or move the LG closer to the laptop."  # under the title "Too close"
+TOO_CLOSE = "Turn your head a little more, or move the external monitor closer to the laptop."  # under the title "Too close"
 HINT = "Look at each screen: the water should follow."
 CARDS = {
-    "lg_card": ("LG", "Look at this screen", "Follow the drop with your eyes"),
+    "external_card": ("EXTERNAL", "Look at this screen", "Follow the drop with your eyes"),
     "lap_card": ("LAPTOP", "Now this screen", "Follow the drop"),
 }
 
 
 @dataclass(frozen=True)
 class Card:
-    screen: str  # "LG" or "LAPTOP"
+    screen: str  # "EXTERNAL" or "LAPTOP"
     title: str
     subtitle: str
 
@@ -87,9 +87,9 @@ class CalibrationResult:
 
 
 class CalibrationSession:
-    def __init__(self, lg: Rect, laptop: Rect, dock: Point) -> None:
-        self.lg, self.laptop, self.dock = lg, laptop, dock
-        self._lg_tour = tour_points(lg)
+    def __init__(self, ext: Rect, laptop: Rect, dock: Point) -> None:
+        self.ext, self.laptop, self.dock = ext, laptop, dock
+        self._external_tour = tour_points(ext)
         self._lap_tour = tour_points(laptop, laptop=True)
         self._ends, t = [], 0.0
         for _, seconds in PHASES:
@@ -98,7 +98,7 @@ class CalibrationSession:
         self.start(0.0)
 
     def start(self, now: float) -> None:
-        """Begin (or Redo) from the top: the intro has closed, the LG comes first."""
+        """Begin (or Redo) from the top: the intro has closed, the external monitor comes first."""
         self.t0 = self.last_now = now
         self.tau = 0.0  # timeline time: wall time minus the time tours stood waiting
         self._i = 0
@@ -107,7 +107,7 @@ class CalibrationSession:
         self._face = False
         self._last_t: float | None = None
         self._lost_since = now
-        self._samples: dict[str, list[HeadSample]] = {"LG": [], "LAPTOP": []}
+        self._samples: dict[str, list[HeadSample]] = {"EXTERNAL": [], "LAPTOP": []}
 
     @property
     def phase(self) -> str:
@@ -166,13 +166,13 @@ class CalibrationSession:
 
     def _pos(self, tau: float) -> Point:
         name, f = self._phase_at(max(0.0, tau))
-        lg_c, lap_c = at(self.lg, 0.5, 0.5), at(self.laptop, 0.5, 0.5)
+        external_c, lap_c = at(self.ext, 0.5, 0.5), at(self.laptop, 0.5, 0.5)
         return {
             "start": lambda: self.dock,
-            "lg_travel": lambda: travel(self.dock, lg_c, f),
-            "lg_card": lambda: lg_c,
-            "lg_tour": lambda: catmull_rom(self._lg_tour, f),
-            "lap_travel": lambda: travel(lg_c, lap_c, f),
+            "external_travel": lambda: travel(self.dock, external_c, f),
+            "external_card": lambda: external_c,
+            "external_tour": lambda: catmull_rom(self._external_tour, f),
+            "lap_travel": lambda: travel(external_c, lap_c, f),
             "lap_card": lambda: lap_c,
             "lap_tour": lambda: catmull_rom(self._lap_tour, f),
             "return": lambda: travel(lap_c, self.dock, f),
@@ -182,7 +182,7 @@ class CalibrationSession:
         name = self.phase
         if name in ("start", "done", "cancelled"):
             return 0.0
-        if name == "lg_travel":
+        if name == "external_travel":
             return min(1.0, (self.tau - self._begin(self._i)) / FADE_S)
         if name == "outro":
             return max(0.0, 1 - (self.tau - self._begin(self._i)) / FADE_S)
@@ -190,11 +190,11 @@ class CalibrationSession:
 
     def _dims(self) -> dict[str, float]:
         name = self.phase
-        if name.startswith("lg_"):
-            return {"LG": DIM_ON, "LAPTOP": DIM_OFF}
+        if name.startswith("external_"):
+            return {"EXTERNAL": DIM_ON, "LAPTOP": DIM_OFF}
         if name.startswith("lap_") or name == "return":
-            return {"LG": DIM_OFF, "LAPTOP": DIM_ON}
-        return {"LG": 0.0, "LAPTOP": 0.0}
+            return {"EXTERNAL": DIM_OFF, "LAPTOP": DIM_ON}
+        return {"EXTERNAL": 0.0, "LAPTOP": 0.0}
 
     def frame(self, now: float) -> OverlayFrame:
         self._advance(now)
@@ -210,7 +210,7 @@ class CalibrationSession:
             dx, dy = x - px, y - py
             dist = math.hypot(dx, dy)
             if dist > 1e-6:
-                screen = self.laptop if name.startswith("lap") or name in ("return", "outro") else self.lg
+                screen = self.laptop if name.startswith("lap") or name in ("return", "outro") else self.ext
                 along, across = squash(stretch(mockup_velocity(dist, FRAME_60, screen[2])))
                 angle = math.degrees(math.atan2(dy, dx))
         drop = DropState(x, y, self._opacity(), along, across, angle)
@@ -238,11 +238,11 @@ class CalibrationSession:
         if min(counts.values()) < MIN_CAL_SAMPLES:
             return CalibrationResult(
                 None, samples, counts, None, "Too few samples",
-                f"Saw your face {counts['LG']} times on the LG and {counts['LAPTOP']} on the laptop "
+                f"Saw your face {counts['EXTERNAL']} times on the external monitor and {counts['LAPTOP']} on the laptop "
                 f"({MIN_CAL_SAMPLES} each needed). Is the room too dark?",
             )
         try:
-            model = fit_zone_model(samples["LG"], samples["LAPTOP"])
+            model = fit_zone_model(samples["EXTERNAL"], samples["LAPTOP"])
         except ValueError:
             return CalibrationResult(None, samples, counts, "too close", "Too close", TOO_CLOSE)
         q = quality(model.separation)

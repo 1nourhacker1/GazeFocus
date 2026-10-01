@@ -27,7 +27,7 @@ def status_icon(status: Status, focus: Zone | None, size: int = 32) -> QIcon:
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
     k = size / 32.0
-    tiles = {Zone.LG: QRectF(2 * k, 7 * k, 15 * k, 11 * k), Zone.LAPTOP: QRectF(19 * k, 11 * k, 11 * k, 9 * k)}
+    tiles = {Zone.EXTERNAL: QRectF(2 * k, 7 * k, 15 * k, 11 * k), Zone.LAPTOP: QRectF(19 * k, 11 * k, 11 * k, 9 * k)}
     for zone, rect in tiles.items():
         path = QPainterPath()
         path.addRoundedRect(rect, 2.5 * k, 2.5 * k)
@@ -111,7 +111,7 @@ class Tray:
     def update(self, status: Status, focus: Zone | None) -> None:
         self.icon.setIcon(status_icon(status, focus))
         text = f"GazeFocus: {status.value}"
-        if status is Status.RUNNING and focus in (Zone.LG, Zone.LAPTOP):
+        if status is Status.RUNNING and focus in (Zone.EXTERNAL, Zone.LAPTOP):
             text += f" (focus on {focus.value})"
         self.icon.setToolTip(text)
         self.status_action.setText(text)

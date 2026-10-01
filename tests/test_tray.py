@@ -6,7 +6,7 @@ from gazefocus.types import Zone
 
 
 @pytest.mark.parametrize("status", list(Status))
-@pytest.mark.parametrize("focus", [Zone.LG, Zone.LAPTOP, None])
+@pytest.mark.parametrize("focus", [Zone.EXTERNAL, Zone.LAPTOP, None])
 def test_every_status_has_an_icon(qapp, status, focus):
     icon = status_icon(status, focus)
     assert not icon.isNull() and not icon.pixmap(32, 32).toImage().isNull()
@@ -52,8 +52,8 @@ def test_focus_is_not_stolen_back_from_a_window_the_menu_opened(qapp):
 
 def test_update_shows_status_and_pause_resume(qapp):
     tray, _ = make(qapp)
-    tray.update(Status.RUNNING, Zone.LG)
-    assert tray.icon.toolTip() == "GazeFocus: running (focus on LG)"
+    tray.update(Status.RUNNING, Zone.EXTERNAL)
+    assert tray.icon.toolTip() == "GazeFocus: running (focus on EXTERNAL)"
     assert tray.pause_action.text() == "Pause (Ctrl+Alt+G)"
     tray.update(Status.PAUSED, None)
     assert tray.icon.toolTip() == "GazeFocus: paused" and tray.pause_action.text().startswith("Resume")

@@ -7,9 +7,9 @@ from gazefocus.calib.overlay import DROP_WINDOW, Overlay, draw_drop
 from gazefocus.calib.session import Card, DropState, OverlayFrame
 from gazefocus.win.capture import keep_on_top
 
-LG = (-1920.0, -302.0, 1920.0, 1080.0)
+EXTERNAL = (-1920.0, -302.0, 1920.0, 1080.0)
 LAP = (0.0, 0.0, 1706.0, 1066.0)
-DIMS = {"LG": 0.25, "LAPTOP": 0.62}
+DIMS = {"EXTERNAL": 0.25, "LAPTOP": 0.62}
 
 
 class FakeGrabber:
@@ -26,14 +26,14 @@ class FakeGrabber:
         self.closed = True
 
 
-def frame(dims=DIMS, drop=DropState(100.0, 200.0, 1.0), ring=None, card=None, phase="lg_tour"):
+def frame(dims=DIMS, drop=DropState(100.0, 200.0, 1.0), ring=None, card=None, phase="external_tour"):
     return OverlayFrame(phase, dict(dims), drop, ring, card)
 
 
 @pytest.fixture
 def overlay(qapp):
     FakeGrabber.made = []
-    o = Overlay({"LG": LG, "LAPTOP": LAP}, native=False, grabber_factory=FakeGrabber)
+    o = Overlay({"EXTERNAL": EXTERNAL, "LAPTOP": LAP}, native=False, grabber_factory=FakeGrabber)
     o.open()
     yield o
     o.hide()
@@ -53,13 +53,13 @@ def test_every_overlay_window_is_click_through_and_never_takes_focus(overlay):
 
 
 def test_each_dim_covers_its_screen_and_fades_to_the_frame(overlay):
-    assert overlay.dims["LG"].geometry().getRect() == (-1920, -302, 1920, 1080)
+    assert overlay.dims["EXTERNAL"].geometry().getRect() == (-1920, -302, 1920, 1080)
     overlay.show(frame(), 10.0)
-    assert overlay.dims["LG"].windowOpacity() == pytest.approx(0.0, abs=0.01)
+    assert overlay.dims["EXTERNAL"].windowOpacity() == pytest.approx(0.0, abs=0.01)
     overlay.show(frame(), 10.3)
-    assert 0.05 < overlay.dims["LG"].windowOpacity() < 0.25
+    assert 0.05 < overlay.dims["EXTERNAL"].windowOpacity() < 0.25
     overlay.show(frame(), 10.61)
-    assert overlay.dims["LG"].windowOpacity() == pytest.approx(0.25, abs=0.01)
+    assert overlay.dims["EXTERNAL"].windowOpacity() == pytest.approx(0.25, abs=0.01)
     assert overlay.dims["LAPTOP"].windowOpacity() == pytest.approx(0.62, abs=0.01)
     assert not overlay.busy(10.61)
 
@@ -97,9 +97,9 @@ def test_a_hidden_drop_draws_nothing(qapp):
 
 
 def test_the_card_appears_on_its_screen_with_its_text(overlay):
-    card = Card("LG", "Look at this screen", "Follow the drop with your eyes")
+    card = Card("EXTERNAL", "Look at this screen", "Follow the drop with your eyes")
     overlay.show(frame(card=card), 5.0)
-    w = overlay.cards["LG"]
+    w = overlay.cards["EXTERNAL"]
     assert w.card == card and overlay.cards["LAPTOP"].card is None
     g = w.geometry()
     assert g.center().x() == pytest.approx(-960, abs=2)
@@ -126,7 +126,7 @@ def test_keep_on_top_refuses_a_missing_window():
 
 
 def test_each_card_window_starts_on_its_own_screen(overlay):
-    """So its first render already has that screen's pixel ratio (the laptop is 150 %, the LG 100 %)."""
-    for name, (x, y, w, h) in (("LG", LG), ("LAPTOP", LAP)):
+    """So its first render already has that screen's pixel ratio (the laptop is 150 %, the external monitor 100 %)."""
+    for name, (x, y, w, h) in (("EXTERNAL", EXTERNAL), ("LAPTOP", LAP)):
         c = overlay.cards[name].geometry().center()
         assert x <= c.x() < x + w and y <= c.y() < y + h, name

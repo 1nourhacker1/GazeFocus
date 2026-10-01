@@ -12,11 +12,11 @@ from gazefocus.dock.motion import FPS, ease_in_out
 Point = tuple[float, float]
 Rect = tuple[float, float, float, float]
 
-LG_TOUR = ((0.5, 0.5), (0.1, 0.14), (0.9, 0.14), (0.9, 0.86), (0.1, 0.86), (0.5, 0.5))
+EXTERNAL_TOUR = ((0.5, 0.5), (0.1, 0.14), (0.9, 0.14), (0.9, 0.86), (0.1, 0.86), (0.5, 0.5))
 # The top waypoints sit lower on the laptop, clear of the dock under the camera.
 LAPTOP_TOUR = ((0.5, 0.5), (0.12, 0.24), (0.88, 0.24), (0.88, 0.86), (0.12, 0.86), (0.5, 0.5))
 ARC_LIFT = 60.0  # the travel arc's control point sits this far above the higher end
-MOCKUP_SCREEN_W = 500.0  # the mockup's LG was ~500 px wide; its stretch constants assume that scale
+MOCKUP_SCREEN_W = 500.0  # the mockup's EXTERNAL was ~500 px wide; its stretch constants assume that scale
 MAX_STRETCH = 0.55
 
 
@@ -26,7 +26,7 @@ def at(rect: Rect, u: float, v: float) -> Point:
 
 
 def tour_points(rect: Rect, laptop: bool = False) -> list[Point]:
-    return [at(rect, u, v) for u, v in (LAPTOP_TOUR if laptop else LG_TOUR)]
+    return [at(rect, u, v) for u, v in (LAPTOP_TOUR if laptop else EXTERNAL_TOUR)]
 
 
 def _cr(a: float, b: float, c: float, d: float, t: float) -> float:
