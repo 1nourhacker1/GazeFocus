@@ -180,3 +180,24 @@ def test_without_a_console_the_log_does_not_go_to_stderr(monkeypatch, tmp_path):
 
     monkeypatch.setattr("sys.stderr", None)  # what pythonw gives a windowless app
     assert log_to_stderr() is False
+
+
+def test_the_selftest_checks_qt_the_model_and_the_renderer(qapp, tmp_path):
+    """A standalone build is checked with `GazeFocus.exe --selftest REPORT`: no window, no camera."""
+    from gazefocus.app.main import selftest
+
+    out = tmp_path / "report.txt"
+    assert selftest(out) == 0
+    text = out.read_text(encoding="utf-8")
+    for part in ("ok: qt", "ok: face model", "ok: glass", "ok: monitors"):
+        assert part in text, text
+
+
+def test_the_launcher_runs_the_selftest_when_asked(monkeypatch, tmp_path):
+    from gazefocus.app import main as app_main
+
+    calls = []
+    monkeypatch.setattr(app_main, "selftest", lambda out: calls.append(out) or 0)
+    monkeypatch.setattr(app_main, "run_app", lambda **kw: calls.append("app") or 0)
+    monkeypatch.setattr("sys.argv", ["GazeFocus.exe", "--selftest", str(tmp_path / "r.txt")])
+    assert app_main.gui_main() == 0 and calls == [tmp_path / "r.txt"]

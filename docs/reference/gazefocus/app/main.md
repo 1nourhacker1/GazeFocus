@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@b887938 · 2026-10-01
+Verified against: GazeFocus@PENDING · 2026-10-01
 
 `run_app()`:
 1. DPI awareness.
@@ -11,7 +11,7 @@ Verified against: GazeFocus@b887938 · 2026-10-01
 7. A 1 Hz `tick`, and a 200 ms wake timer so Ctrl+C works.
 8. `qapp.exec()`, then `close()` on the way out.
 
-**`gui_main()`** is `gazefocus-app.exe` (a `[project.gui-scripts]` entry, run by pythonw with no console): it calls `run_app()`. Without a console, `log_to_stderr()` is False, so the log goes only to the files.
+**`gui_main()`** is `gazefocus-app.exe` (a `[project.gui-scripts]` entry, run by pythonw with no console) and the standalone build's `GazeFocus.exe`: it calls `run_app()`. With `--selftest REPORT` it runs `selftest(REPORT)` instead: Qt (the platform and the tray icon), the face model on a black frame, a glass render, and the monitors, one `ok:`/`FAILED:` line each, and `RESULT:` last; exit 0 only if all passed. No window opens and the camera stays off (`scripts/build_standalone.py` and CI use it). Without a console, `log_to_stderr()` is False, so the log goes only to the files.
 
 `GazeFocusApp` wires, on the Qt main thread:
 - `MessageWindow` carrying `InputWatcher` (Raw Input; its `InputTracker` reports each real key-down to `_on_key`, which hears calibration's Esc), `Hotkey` (Ctrl+Alt+G → `toggle_pause`) and `SystemEvents` (lock, unlock, suspend, resume, display change → re-layout after 1.5 s).

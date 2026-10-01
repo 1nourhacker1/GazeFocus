@@ -47,6 +47,13 @@ This does everything:
 | Update | the same line again (quit GazeFocus from its tray icon first) |
 | Uninstall | `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/1nourhacker1/GazeFocus/main/install.ps1))) -Uninstall` (your settings and calibration in `%APPDATA%\GazeFocus` stay until you delete that folder) |
 
+### Or download it (no setup at all)
+From [Releases](https://github.com/1nourhacker1/GazeFocus/releases/latest), download `GazeFocus-<version>-windows-x64.zip`:
+1. Unzip it anywhere, for example into `%LOCALAPPDATA%\Programs`.
+2. Run `GazeFocus\GazeFocus.exe`. Python, Qt, MediaPipe and the face model are all inside.
+
+It isn't code-signed, so Windows SmartScreen may warn the first time: choose **More info → Run anyway**. To update, quit it from the tray and unzip the new version over the old one.
+
 ### From source
 ```bash
 git clone https://github.com/1nourhacker1/GazeFocus
@@ -115,12 +122,14 @@ Design: [`docs/superpowers/specs/2026-09-29-gazefocus-design.md`](docs/superpowe
 ## Limitations
 - Exactly two screens, and a webcam on the laptop. It tells left from right with your head; it isn't a pixel-accurate gaze tracker.
 - Calibrate again if you move the external monitor, change how you sit, or change the display layout. The dock shows "!" when the layout changes.
+- While an app running as administrator is in front, Windows doesn't let GazeFocus move focus away from it (unless GazeFocus runs as administrator too).
 - Windows only.
 
 ## Development
 ```bash
 uv run pytest                     # ~500 tests, no camera needed (three need the downloaded model)
 uv run --with ruff ruff check     # lint
+uv run --with pyinstaller==6.22.3 python scripts/build_standalone.py   # the standalone zip, self-tested
 ```
 - Tests never move the real focus, open the camera or play audio. The Qt ones run on the offscreen platform.
 - Don't run two test sessions at once: one test registers a global hotkey.

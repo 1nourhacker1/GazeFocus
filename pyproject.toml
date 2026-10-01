@@ -1,6 +1,6 @@
 [project]
 name = "gazefocus"
-version = "0.1.0"
+version = "0.1.1"
 description = "Webcam focus-follows-gaze for a laptop and one external monitor on Windows"
 readme = "README.md"
 license = "MIT"

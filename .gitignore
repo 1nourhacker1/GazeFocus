@@ -5,3 +5,5 @@ __pycache__/
 models/
 .superpowers/
 .playwright-mcp/
+build/
+dist/

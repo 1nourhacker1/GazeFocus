@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 
@@ -11,8 +12,15 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def bundle_dir() -> Path:
+    """Where the app's own files are: the repo, or inside a standalone (PyInstaller) build its bundle folder."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return repo_root()
+
+
 def model_path() -> Path:
-    return repo_root() / "models" / "face_landmarker.task"
+    return bundle_dir() / "models" / "face_landmarker.task"
 
 
 def app_dir() -> Path:

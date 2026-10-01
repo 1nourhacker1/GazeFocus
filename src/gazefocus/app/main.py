@@ -642,8 +642,75 @@ def log_to_stderr() -> bool:
     return sys.stderr is not None
 
 
+def selftest(out: "os.PathLike[str] | str") -> int:
+    """Check a build without showing anything or opening the camera: Qt, the face model, the glass renderer,
+    the Win32 calls. Writes one line per check to `out`; 0 if every check passed."""
+    from pathlib import Path
+
+    lines, ok = [], True
+
+    def check(name: str, fn) -> None:
+        nonlocal ok
+        try:
+            lines.append(f"ok: {name}: {fn()}")
+        except Exception as e:  # report every failure, not just the first
+            ok = False
+            lines.append(f"FAILED: {name}: {type(e).__name__}: {e}")
+
+    def qt() -> str:
+        from PySide6 import __version__ as pyside
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtWidgets import QApplication
+
+        from gazefocus.app.tray import status_icon
+
+        QApplication.instance() or QApplication([])
+        icon = status_icon(Status.RUNNING, Zone.LAPTOP)
+        return f"PySide6 {pyside}, platform {QGuiApplication.platformName()}, icon {not icon.isNull()}"
+
+    def face_model() -> str:
+        import numpy as np
+
+        from gazefocus.paths import model_path
+        from gazefocus.vision.tracker import HeadTracker
+
+        tracker = HeadTracker(model_path())
+        try:
+            sample = tracker.process(np.zeros((480, 640, 3), np.uint8), 0.0)
+        finally:
+            tracker.close()
+        return f"{model_path().name} loaded; a black frame has a face: {sample.face}"
+
+    def glass_render() -> str:
+        import cv2
+        import numpy as np
+
+        from gazefocus.dock import geometry, glass
+
+        w, h = 200, 100
+        backdrop = glass.prepare(np.full((h, w, 3), 128, np.uint8), 1.0, True)
+        out = np.zeros((h, w, 4), np.uint8)
+        glass.render(backdrop, geometry.Pill(100, 50, 60, 25, 25), dpr=1.0, dark=False, openness=0.0,
+                     refraction=True, step=1, grid=glass.Grid(w, h), out=out)
+        return f"OpenCV {cv2.__version__}, NumPy {np.__version__}, alpha {int(out[50, 100, 3])}"
+
+    check("qt", qt)
+    check("face model", face_model)
+    check("glass", glass_render)
+    check("monitors", lambda: f"{len(enumerate_monitors())} found")
+    lines.append("RESULT: " + ("ok" if ok else "FAILED"))
+    Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return 0 if ok else 1
+
+
 def gui_main() -> int:
-    """`gazefocus-app.exe`: the background app with no console window."""
+    """`gazefocus-app.exe` (and the standalone GazeFocus.exe): the background app with no console window.
+    `--selftest REPORT` checks the build instead (no window, no camera)."""
+    if len(sys.argv) >= 2 and sys.argv[1] == "--selftest":
+        import tempfile
+        from pathlib import Path
+
+        return selftest(Path(sys.argv[2]) if len(sys.argv) > 2 else Path(tempfile.gettempdir()) / "gazefocus-selftest.txt")
     return run_app()
 
 
