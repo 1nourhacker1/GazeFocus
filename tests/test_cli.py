@@ -172,7 +172,6 @@ def test_a_windowless_launcher_starts_the_app(monkeypatch):
 
 
 def test_without_a_console_the_log_does_not_go_to_stderr(monkeypatch, tmp_path):
-    import logging
 
     from gazefocus.app.main import log_to_stderr
 

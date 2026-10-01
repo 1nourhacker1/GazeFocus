@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Callable
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPen
 
-from gazefocus.dock.panel import BTN, SUB, TEXT, _font
+from gazefocus.dock.panel import BTN, TEXT, _font
 
 if TYPE_CHECKING:
     from gazefocus.calib.session import CalibrationResult

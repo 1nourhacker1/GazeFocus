@@ -1,6 +1,5 @@
 import logging
 
-import pytest
 
 from gazefocus.app.controller import Controller, Desktop
 from gazefocus.app.decision_log import DecisionLogger

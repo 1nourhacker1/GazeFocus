@@ -155,7 +155,7 @@ class GlyphScene:
                 self.scale[z].to(s, now, 0.42, ease_in_out)
 
     def _flow(self, src: Zone, dst: Zone, now: float) -> None:
-        (ax, ay, aw, ah), (bx, by, bw, bh) = TILES[src], TILES[dst]
+        (ax, ay, aw, _), (bx, by, bw, bh) = TILES[src], TILES[dst]
         p0 = (ax + aw / 2, level(src, self.fill[src].get(now)) + 1.5)
         p2 = (bx + bw / 2, by + bh * 0.62)
         self.stream = Stream(p0, ((p0[0] + p2[0]) / 2, min(ay, by) - 6), p2, now, SWITCH_S)

@@ -32,3 +32,19 @@ packages = ["src/gazefocus"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = [
+  "B008",  # frozen-dataclass defaults are safe
+  "B905",  # zip() lengths are checked where it matters
+  "E741",  # l, w: the Win32 names (lParam, wParam)
+  "E731",  # small lambdas in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # some tests set the environment before importing

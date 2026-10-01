@@ -5,7 +5,6 @@ Points are (x, y) in Qt logical px of the virtual desktop; a screen is (x, y, w,
 
 from __future__ import annotations
 
-import math
 
 from gazefocus.dock.motion import FPS, ease_in_out
 
