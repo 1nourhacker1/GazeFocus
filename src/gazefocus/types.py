@@ -20,6 +20,10 @@ class Zone(Enum):
         return cls(LEGACY_NAMES[value]) if value in LEGACY_NAMES else None  # old recordings still replay
 
 
+# What the user reads. The app replaces "External" with the monitor's own name from Windows ("LG FHD").
+ZONE_NAMES = {Zone.EXTERNAL: "External", Zone.LAPTOP: "Laptop"}
+
+
 @dataclass(frozen=True)
 class HeadSample:
     """One processed camera frame. Angles in degrees; iris offsets in -1..1."""

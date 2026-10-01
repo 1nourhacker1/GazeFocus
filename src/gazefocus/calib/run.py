@@ -29,8 +29,9 @@ class CalibrationRun:
         clock: Callable[[], float] = time.perf_counter,
         native: bool = True,
         refraction: bool = True,
+        external_name: str | None = None,
     ) -> None:
-        self.session = CalibrationSession(screens["EXTERNAL"], screens["LAPTOP"], dock)
+        self.session = CalibrationSession(screens["EXTERNAL"], screens["LAPTOP"], dock, external_name)
         if overlay is None:
             from gazefocus.calib.overlay import Overlay
 

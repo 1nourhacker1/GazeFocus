@@ -14,7 +14,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from gazefocus.app.state import Status
-from gazefocus.types import Zone
+from gazefocus.types import ZONE_NAMES, Zone
 
 GREEN, BLUE, GREY, RED = QColor(40, 167, 69), QColor(10, 132, 255), QColor(142, 142, 147), QColor(255, 69, 58)
 ATTENTION = {Status.CAMERA_WAIT, Status.NOT_CALIBRATED, Status.LAYOUT_CHANGED, Status.UNSUPPORTED, Status.TRACKER_FAILED}
@@ -108,11 +108,11 @@ class Tray:
             self.restore_focus()
         self._opened_window = False
 
-    def update(self, status: Status, focus: Zone | None) -> None:
+    def update(self, status: Status, focus: Zone | None, names: dict[Zone, str] | None = None) -> None:
         self.icon.setIcon(status_icon(status, focus))
         text = f"GazeFocus: {status.value}"
         if status is Status.RUNNING and focus in (Zone.EXTERNAL, Zone.LAPTOP):
-            text += f" (focus on {focus.value})"
+            text += f" (focus on {(names or ZONE_NAMES)[focus]})"
         self.icon.setToolTip(text)
         self.status_action.setText(text)
         paused = status is Status.PAUSED

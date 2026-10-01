@@ -124,6 +124,7 @@ class FakeRun:
 
     def __init__(self, screens, dock, *, on_done, cue, on_open, **kw):
         self.screens, self.dock_point, self.on_done, self.cue, self.on_open = screens, dock, on_done, cue, on_open
+        self.kw = kw
         self.samples, self.started, self.cancelled, self.active = [], False, False, False
         FakeRun.made.append(self)
 
@@ -748,3 +749,31 @@ def test_the_tracker_giving_up_during_a_run_cancels_it(rig, qapp):
     app.state.tracker_failures = MAX_TRACKER_FAILURES - 1
     app._on_crashed("mediapipe exploded")
     assert run.cancelled and app.state.status is Status.TRACKER_FAILED and not app.worker.running
+
+
+def test_the_dock_and_tray_call_the_external_monitor_by_its_name(rig, qapp):
+    app, desktop = running_app(rig), rig[1]
+    app._screen_name = lambda m: None if m.primary else "LG FHD"
+    app.refresh_layout()
+    app.apply()
+    FakeTracker.yaw = 30.0
+    assert wait_until(qapp, lambda: desktop.brought == [11])
+    app.apply()  # the tray refreshes here (and once a second)
+    assert rig[4]["docks"][-1].views[-1].title == "Focus: LG FHD"
+    assert "focus on LG FHD" in app.tray.icon.toolTip()
+
+
+def test_the_run_gets_the_external_monitors_name(rig, qapp):
+    app = rig[0]
+    app._screen_name = lambda m: None if m.primary else "LG FHD"
+    app.refresh_layout()
+    app, dock, run = start_run(rig, qapp)
+    assert run.kw["external_name"] == "LG FHD"
+
+
+def test_qt_screen_name_matches_by_origin(qapp):
+    from gazefocus.app.main import qt_screen_name
+
+    here = MonitorInfo("any", "id", (0, 0, 800, 800), (0, 0, 800, 800), True)
+    elsewhere = MonitorInfo("any", "id", (-1920, -302, 0, 778), (-1920, -302, 0, 778), False)
+    assert isinstance(qt_screen_name(here), str) and qt_screen_name(elsewhere) is None

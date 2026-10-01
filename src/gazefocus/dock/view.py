@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from gazefocus.app.state import Status
 from gazefocus.logic.decider import reason_category
-from gazefocus.types import Decision, HeadSample, Zone
+from gazefocus.types import ZONE_NAMES, Decision, HeadSample, Zone
 
 TRACKING, PAUSED, ALERT, IDLE = "tracking", "paused", "alert", "idle"
 PAUSED_TITLES = {Status.PAUSED: "Paused", Status.LOCKED: "Screen locked", Status.SUSPENDED: "Asleep"}
@@ -17,7 +17,7 @@ ALERT_TITLES = {
     Status.UNSUPPORTED: "Unsupported monitor layout",
     Status.TRACKER_FAILED: "Tracker failed",
 }
-NAMES = {Zone.EXTERNAL: "EXTERNAL", Zone.LAPTOP: "Laptop"}
+NAMES = ZONE_NAMES
 
 
 @dataclass(frozen=True)
@@ -45,11 +45,12 @@ def view_for(
     sample: HeadSample | None,
     now: float,
     freeze_s: float,
+    names: dict[Zone, str] | None = None,
 ) -> DockView:
     if status is Status.RUNNING:
         typing = last_key_t is not None and now - last_key_t < freeze_s
         blocked = decision is not None and decision.action == "blocked" and reason_category(decision.reason) == "typing"
-        name = NAMES.get(focus, "?")
+        name = (names or NAMES).get(focus, "?")
         title = f"No face, holding {name}" if not face else "Frozen while typing" if typing else f"Focus: {name}"
         return DockView(TRACKING, focus, face, last_key_t, blocked, title, _detail(sample, decision, last_key_t, now))
     if status in PAUSED_TITLES:

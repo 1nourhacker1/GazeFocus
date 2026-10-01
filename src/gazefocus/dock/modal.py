@@ -49,6 +49,18 @@ def modal_button_at(kind: str, x: float, y: float, left: float, top: float,
     return None
 
 
+NAME_MAX = 12  # a long monitor name is cut, so the stats and labels fit
+
+
+def stats_text(result: "CalibrationResult") -> str:
+    """The mono stats: each screen's mean yaw / pitch, under its own name, in aligned columns."""
+    m = result.model
+    ext, lap = result.names["EXTERNAL"][:NAME_MAX], result.names["LAPTOP"][:NAME_MAX]
+    w = max(len(ext), len(lap))
+    return (f"yaw / pitch\n{ext:<{w}} {fmt_deg(m.mean_external[0])} / {fmt_deg(m.mean_external[1])}\n"
+            f"{lap:<{w}} {fmt_deg(m.mean_laptop[0])} / {fmt_deg(m.mean_laptop[1])}")
+
+
 def fmt_deg(v: float) -> str:
     """The mockup's `fm`: +29°, −4°, 0°."""
     sign = "+" if v > 0 else "−" if v < 0 else ""
@@ -158,10 +170,11 @@ def _draw_scatter(p: QPainter, result: "CalibrationResult", dark: bool) -> None:
         fm = QFontMetricsF(f)
         lx, ly = to_xy(m.mean_external[0], m.mean_external[1])
         rx, ry = to_xy(m.mean_laptop[0], m.mean_laptop[1])
-        lx = max(4.0, lx - 18 - fm.horizontalAdvance("EXTERNAL"))
-        rx = min(box.width() - 4 - fm.horizontalAdvance("Laptop"), rx + 18)
-        p.drawText(QPointF(lx, ly + 3), "EXTERNAL")
-        p.drawText(QPointF(rx, ry + 3), "Laptop")
+        left, right = result.names["EXTERNAL"][:NAME_MAX], result.names["LAPTOP"][:NAME_MAX]
+        lx = max(4.0, lx - 18 - fm.horizontalAdvance(left))
+        rx = min(box.width() - 4 - fm.horizontalAdvance(right), rx + 18)
+        p.drawText(QPointF(lx, ly + 3), left)
+        p.drawText(QPointF(rx, ry + 3), right)
     p.restore()
 
 
@@ -177,9 +190,7 @@ def draw_result(p: QPainter, left: float, top: float, result: "CalibrationResult
     if result.can_save:
         p.setPen(HINT[dark])
         p.setFont(_font(10.5, family="Cascadia Mono"))
-        stats = (f"yaw / pitch\nLG     {fmt_deg(m.mean_external[0])} / {fmt_deg(m.mean_external[1])}\n"
-                 f"Laptop {fmt_deg(m.mean_laptop[0])} / {fmt_deg(m.mean_laptop[1])}")
-        p.drawText(QRectF(x, 46, COL_W, 50), Qt.AlignLeft | Qt.AlignTop, stats)
+        p.drawText(QRectF(x, 46, COL_W, 50), Qt.AlignLeft | Qt.AlignTop, stats_text(result))
     else:
         p.setPen(HINT[dark])
         p.setFont(_font(11))

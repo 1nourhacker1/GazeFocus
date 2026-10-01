@@ -101,3 +101,16 @@ def test_the_scatter_shows_each_screen_in_its_colour(qapp):
 def test_a_transparent_modal_panel_draws_nothing(qapp):
     img = render(lambda p: draw_result(p, LEFT, TOP, result(), opacity=0.0, dark=False))
     assert all(img.pixelColor(x, y).alpha() == 0 for x in range(0, 392, 7) for y in range(0, 212, 7))
+
+
+def test_the_stats_name_each_screen():
+    from dataclasses import replace
+
+    from gazefocus.dock.modal import stats_text
+
+    r = replace(result(), names={"EXTERNAL": "LG FHD", "LAPTOP": "Laptop"})
+    lines = stats_text(r).splitlines()
+    assert lines[0] == "yaw / pitch" and lines[1].startswith("LG FHD ") and lines[2].startswith("Laptop ")
+    assert lines[1].index("+") == lines[2].index(next(c for c in lines[2] if c in "+−0"))  # the columns line up
+    long = replace(r, names={"EXTERNAL": "LG ULTRAGEAR 27GN950-B", "LAPTOP": "Laptop"})
+    assert stats_text(long).splitlines()[1].startswith("LG ULTRAGEAR +")  # long names are cut to 12

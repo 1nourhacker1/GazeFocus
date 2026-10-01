@@ -37,7 +37,7 @@ GIVE_UP_S = 20.0  # a tour waiting this long for a face ends the run (a busy cam
 FADE_S = 0.25
 FRAME_60 = 1 / 60  # stretch is measured over one of the mockup's 60 Hz frames
 DIM_ON, DIM_OFF = 0.25, 0.62  # the screen to look at, the other one
-TOO_CLOSE = "Turn your head a little more, or move the external monitor closer to the laptop."  # under the title "Too close"
+TOO_CLOSE = "Turn your head a little more, or move the {screen} closer to the laptop."  # under the title "Too close"
 HINT = "Look at each screen: the water should follow."
 CARDS = {
     "external_card": ("EXTERNAL", "Look at this screen", "Follow the drop with your eyes"),
@@ -80,6 +80,7 @@ class CalibrationResult:
     quality: str | None = None
     title: str = ""
     message: str = ""
+    names: dict[str, str] = field(default_factory=lambda: {"EXTERNAL": "External", "LAPTOP": "Laptop"})
 
     @property
     def can_save(self) -> bool:
@@ -87,8 +88,10 @@ class CalibrationResult:
 
 
 class CalibrationSession:
-    def __init__(self, ext: Rect, laptop: Rect, dock: Point) -> None:
+    def __init__(self, ext: Rect, laptop: Rect, dock: Point, external_name: str | None = None) -> None:
         self.ext, self.laptop, self.dock = ext, laptop, dock
+        self.names = {"EXTERNAL": external_name or "External", "LAPTOP": "Laptop"}  # labels
+        self._screen = external_name or "external monitor"  # in sentences
         self._external_tour = tour_points(ext)
         self._lap_tour = tour_points(laptop, laptop=True)
         self._ends, t = [], 0.0
@@ -234,18 +237,21 @@ class CalibrationSession:
             return CalibrationResult(
                 None, samples, counts, None, "Couldn't see you",
                 f"No face for {GIVE_UP_S:.0f} s. Is the room too dark, or is another app using the camera?",
+                self.names,
             )
         if min(counts.values()) < MIN_CAL_SAMPLES:
             return CalibrationResult(
                 None, samples, counts, None, "Too few samples",
-                f"Saw your face {counts['EXTERNAL']} times on the external monitor and {counts['LAPTOP']} on the laptop "
+                f"Saw your face {counts['EXTERNAL']} times on the {self._screen} and {counts['LAPTOP']} on the laptop "
                 f"({MIN_CAL_SAMPLES} each needed). Is the room too dark?",
+                self.names,
             )
+        too_close = TOO_CLOSE.format(screen=self._screen)
         try:
             model = fit_zone_model(samples["EXTERNAL"], samples["LAPTOP"])
         except ValueError:
-            return CalibrationResult(None, samples, counts, "too close", "Too close", TOO_CLOSE)
+            return CalibrationResult(None, samples, counts, "too close", "Too close", too_close, self.names)
         q = quality(model.separation)
         if q == "too close":
-            return CalibrationResult(model, samples, counts, q, "Too close", TOO_CLOSE)
-        return CalibrationResult(model, samples, counts, q, "Calibrated ✓", HINT)
+            return CalibrationResult(model, samples, counts, q, "Too close", too_close, self.names)
+        return CalibrationResult(model, samples, counts, q, "Calibrated ✓", HINT, self.names)

@@ -166,7 +166,7 @@ def test_view_for_running_reads_face_typing_and_blocked():
     assert v.mode == TRACKING and v.blocked and v.title == "Frozen while typing"
     assert "yaw -27.9°" in v.detail and "margin +0.80" in v.detail and "key 0.4 s ago" in v.detail
     gone = view_for(Status.RUNNING, focus=EXTERNAL, face=False, last_key_t=None, decision=None, sample=None, now=5.0, freeze_s=1.5)
-    assert gone.title == "No face, holding EXTERNAL" and not gone.blocked
+    assert gone.title == "No face, holding External" and not gone.blocked
 
 
 def test_tile_geometry_matches_the_mockup():
@@ -191,3 +191,13 @@ def test_no_typing_freeze_means_no_lid_at_all():
     s.update(tracking(EXTERNAL), 0.0)
     s.update(tracking(EXTERNAL, last_key_t=1.0), 1.0)
     assert s.frame(1.05).tiles[EXTERNAL].lid == 0.0
+
+
+def test_the_panel_title_uses_the_monitors_own_name():
+    names = {Zone.EXTERNAL: "LG FHD", Zone.LAPTOP: "Laptop"}
+    v = view_for(Status.RUNNING, focus=EXTERNAL, face=True, last_key_t=None, decision=None, sample=None, now=0.0,
+                 freeze_s=1.5, names=names)
+    assert v.title == "Focus: LG FHD"
+    default = view_for(Status.RUNNING, focus=EXTERNAL, face=True, last_key_t=None, decision=None, sample=None,
+                       now=0.0, freeze_s=1.5)
+    assert default.title == "Focus: External"

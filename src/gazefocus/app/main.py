@@ -30,7 +30,7 @@ from gazefocus.logic.classifier import ZoneClassifier
 from gazefocus.logic.decider import GazeDecider
 from gazefocus.paths import app_dir
 from gazefocus.storage import calibration_path, load_if_matches
-from gazefocus.types import HeadSample, Zone
+from gazefocus.types import ZONE_NAMES, HeadSample, Zone
 from gazefocus.win import _api, focus, rawinput, system, windows
 from gazefocus.win.foreground import ForegroundHook, MruTracker
 from gazefocus.win.monitors import (
@@ -87,6 +87,23 @@ def qt_screen_rect(monitor: MonitorInfo) -> tuple[float, float, float, float] | 
     return None
 
 
+def qt_screen_name(monitor: MonitorInfo) -> str | None:
+    """The monitor's own name as Windows reports it ("LG FHD"), matched by origin like `qt_work_area`."""
+    from PySide6.QtGui import QGuiApplication
+
+    for screen in QGuiApplication.screens():
+        g = screen.geometry()
+        if (g.left(), g.top()) == tuple(monitor.rect[:2]):
+            return screen.name()
+    return None
+
+
+def display_name(name: str | None) -> str | None:
+    """A name worth showing, or None (empty, or Windows' generic "Generic PnP Monitor")."""
+    name = (name or "").strip()
+    return None if not name or name.lower().startswith("generic") else name
+
+
 def make_run(screens, dock, **kw):
     from gazefocus.calib.run import CalibrationRun
 
@@ -133,6 +150,7 @@ class GazeFocusApp:
         screen_work: Callable[[MonitorInfo], "tuple[int, int, int, int] | None"] = qt_work_area,
         fullscreen_on: Callable[[str, tuple[int, int, int, int]], bool] = windows.fullscreen_app_on,
         screen_rect: Callable[[MonitorInfo], "tuple[float, float, float, float] | None"] = qt_screen_rect,
+        screen_name: Callable[[MonitorInfo], str | None] = qt_screen_name,
         run_factory: Callable[..., object] = make_run,
         first_run: bool = True,
     ) -> None:
@@ -144,7 +162,9 @@ class GazeFocusApp:
         self.monitors: list[MonitorInfo] = []
         self._work_areas: dict[str, tuple[int, int, int, int]] = {}
         self.controller: Controller | None = None
-        self._screen_rect, self._run_factory = screen_rect, run_factory
+        self._screen_rect, self._run_factory, self._screen_name = screen_rect, run_factory, screen_name
+        self.names = dict(ZONE_NAMES)  # what the user reads; the external monitor gets its own name
+        self._external_name: str | None = None
         self._intro = False  # the dock shows the calibration's intro
         self._run = None  # the follow-the-drop run (calib.run.CalibrationRun)
         self._result = None  # the finished run's CalibrationResult, while the dock shows it
@@ -201,6 +221,7 @@ class GazeFocusApp:
     def refresh_layout(self) -> None:
         self.monitors = self._monitors_fn()
         self._work_areas = {m.device: m.work for m in self.monitors}
+        self._name_screens()
         self._place_dock()
         self.controller = None
         if len(self.monitors) != 2:
@@ -232,6 +253,12 @@ class GazeFocusApp:
         )
         self.log.info("calibration loaded (%.1f sigma); LAPTOP=%s EXTERNAL=%s", cal.model.separation,
                       zone_devices[Zone.LAPTOP], zone_devices[Zone.EXTERNAL])
+
+    def _name_screens(self) -> None:
+        ext_id = zone_monitors(self.monitors, self.cfg.dock.monitor).get("EXTERNAL") if len(self.monitors) == 2 else None
+        ext = next((m for m in self.monitors if m.id == ext_id), None)
+        self._external_name = display_name(self._screen_name(ext)) if ext is not None else None
+        self.names = {**ZONE_NAMES, Zone.EXTERNAL: self._external_name or ZONE_NAMES[Zone.EXTERNAL]}
 
     # ---- the camera ------------------------------------------------------------------------
     def apply(self) -> None:
@@ -355,7 +382,7 @@ class GazeFocusApp:
         face = self._face_t is None or now - self._face_t < FACE_LOST_S
         if self._preview is not None:  # the result panel: the water follows the new model, nothing switches
             view = view_for(Status.RUNNING, focus=self._preview_zone, face=face, last_key_t=None, decision=None,
-                            sample=self._last_sample, now=now, freeze_s=0.0)
+                            sample=self._last_sample, now=now, freeze_s=0.0, names=self.names)
             self.dock.set_view(view)
             return
         view = view_for(
@@ -367,6 +394,7 @@ class GazeFocusApp:
             sample=self._last_sample,
             now=now,
             freeze_s=self.cfg.decider.typing_freeze_ms / 1000.0,
+            names=self.names,
         )
         self.dock.set_view(view)
 
@@ -452,7 +480,7 @@ class GazeFocusApp:
             dock_point = (x + w / 2, y + 30.0)
         self._run = self._run_factory(
             screens, dock_point, on_done=self._run_done, cue=self._cue, on_open=self._lift_dock,
-            refraction=self.cfg.dock.refraction,
+            refraction=self.cfg.dock.refraction, external_name=self._external_name,
         )
         self.worker.fps = float(self.cfg.camera.fps)  # every sample counts: no idle or battery rate
         self.apply()  # the tracking camera stays on (or starts): the run samples it
@@ -595,7 +623,7 @@ class GazeFocusApp:
 
     def _update_tray(self) -> None:
         focus_zone = self.controller.focus_zone() if self.controller is not None else None
-        self.tray.update(self.state.status, focus_zone)
+        self.tray.update(self.state.status, focus_zone, self.names)
 
     def quit(self) -> None:
         self.qapp.quit()

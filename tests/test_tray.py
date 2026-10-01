@@ -53,7 +53,9 @@ def test_focus_is_not_stolen_back_from_a_window_the_menu_opened(qapp):
 def test_update_shows_status_and_pause_resume(qapp):
     tray, _ = make(qapp)
     tray.update(Status.RUNNING, Zone.EXTERNAL)
-    assert tray.icon.toolTip() == "GazeFocus: running (focus on EXTERNAL)"
+    assert tray.icon.toolTip() == "GazeFocus: running (focus on External)"
+    tray.update(Status.RUNNING, Zone.EXTERNAL, {Zone.EXTERNAL: "LG FHD", Zone.LAPTOP: "Laptop"})
+    assert tray.icon.toolTip() == "GazeFocus: running (focus on LG FHD)"
     assert tray.pause_action.text() == "Pause (Ctrl+Alt+G)"
     tray.update(Status.PAUSED, None)
     assert tray.icon.toolTip() == "GazeFocus: paused" and tray.pause_action.text().startswith("Resume")

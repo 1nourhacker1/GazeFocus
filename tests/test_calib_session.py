@@ -208,3 +208,11 @@ def test_a_tour_gives_up_after_twenty_seconds_without_a_face():
     assert s.frame(5.0 + GIVE_UP_S + 0.1).phase == "done"
     r = s.result()
     assert not r.can_save and r.title == "Couldn't see you"
+
+
+def test_messages_and_the_result_use_the_monitors_own_name():
+    s = CalibrationSession(EXTERNAL, LAP, DOCK, external_name="Dell U2723")
+    s.start(0.0)
+    run(s, 0.0, 17.0, yaw={"EXTERNAL": 1.0, "LAPTOP": 0.0})  # too close
+    r = s.result()
+    assert "move the Dell U2723 closer" in r.message and r.names == {"EXTERNAL": "Dell U2723", "LAPTOP": "Laptop"}
