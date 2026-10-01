@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@362439b · 2026-09-30
+Verified against: GazeFocus@971b2ef · 2026-10-01
 
 `run_app()`:
 1. DPI awareness.
@@ -10,6 +10,8 @@ Verified against: GazeFocus@362439b · 2026-09-30
 6. `GazeFocusApp`.
 7. A 1 Hz `tick`, and a 200 ms wake timer so Ctrl+C works.
 8. `qapp.exec()`, then `close()` on the way out.
+
+**`gui_main()`** is `gazefocus-app.exe` (a `[project.gui-scripts]` entry, run by pythonw with no console): it calls `run_app()`. Without a console, `log_to_stderr()` is False, so the log goes only to the files.
 
 `GazeFocusApp` wires, on the Qt main thread:
 - `MessageWindow` carrying `InputWatcher` (Raw Input; its `InputTracker` reports each real key-down to `_on_key`, which hears calibration's Esc), `Hotkey` (Ctrl+Alt+G → `toggle_pause`) and `SystemEvents` (lock, unlock, suspend, resume, display change → re-layout after 1.5 s).

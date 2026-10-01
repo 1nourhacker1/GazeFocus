@@ -5,7 +5,7 @@ Webcam "focus follows gaze" for a two-monitor Windows desk. Look at a screen, an
 **Status: Plan 4 of 4: the "follow the drop" calibration (accepted at the desk 2026-09-30).** `gazefocus run` is the real app: focus follows your gaze, the dock under the laptop camera shows what it's doing, and Recalibrate guides you with a glowing drop.
 
 ## Using it
-- Start it with `uv run gazefocus run`. A two-tile icon appears in the tray (possibly under the ^ overflow arrow).
+- **Start it** with `.venv\Scripts\gazefocus-app.exe` (no console window: pin it, make a shortcut, or put a shortcut in `shell:startup` to start at login), or from a terminal with `uv run gazefocus run`. A two-tile icon appears in the tray (possibly under the ^ overflow arrow). Quit from the tray.
 - **Before a video call, press Ctrl+Alt+G** (or tray → Pause). This webcam can't be shared, so pausing releases it. Press it again afterwards.
 - **The dock** sits under the laptop camera. The bigger tile holds the water: that's where focus is. Amber water under a lid means frozen while you type; steam means no face; bars mean paused; "!" means something needs you.
   - **Hover** it for the live camera preview, the numbers, and Pause/Recalibrate. **Click** it to pause (or, when it shows "!" because there's no calibration, to calibrate).
