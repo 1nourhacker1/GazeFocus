@@ -31,18 +31,33 @@ A small Liquid Glass status dock sits under the laptop camera. The bigger of its
 - **[uv](https://docs.astral.sh/uv/)**: it installs the Python 3.12 that MediaPipe needs.
 
 ## Install
+In PowerShell (no admin rights needed):
+```powershell
+irm https://raw.githubusercontent.com/1nourhacker1/GazeFocus/main/install.ps1 | iex
+```
+This does everything:
+- installs [uv](https://docs.astral.sh/uv/) if you don't have it;
+- downloads the latest release into `%LOCALAPPDATA%\Programs\GazeFocus`;
+- sets up Python 3.12, the packages and the face model (MediaPipe's, Apache-2.0, SHA-256 checked);
+- adds **GazeFocus** to the Start menu, and starts it. The first start opens the calibration.
+
+| To | Run |
+|---|---|
+| Also start at login | `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/1nourhacker1/GazeFocus/main/install.ps1))) -Startup` |
+| Update | the same line again (quit GazeFocus from its tray icon first) |
+| Uninstall | `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/1nourhacker1/GazeFocus/main/install.ps1))) -Uninstall` (your settings and calibration in `%APPDATA%\GazeFocus` stay until you delete that folder) |
+
+### From source
 ```bash
-git clone <this repo>
+git clone https://github.com/1nourhacker1/GazeFocus
 cd GazeFocus
 uv sync
-uv run python scripts/fetch_model.py   # MediaPipe's face model (Apache-2.0), SHA-256 checked
+uv run python scripts/fetch_model.py
 ```
+Then double-click `.venv\Scripts\gazefocus-app.exe` (no console window), or run `uv run gazefocus run` in a terminal.
 
 ## Run
-- **Without a console:** double-click `.venv\Scripts\gazefocus-app.exe`. You can pin it, make a shortcut, or put a shortcut in `shell:startup` to start at login.
-- **From a terminal:** `uv run gazefocus run`.
-
-A two-tile icon appears in the tray (it may be under the ^ overflow arrow). Quit from the tray. The first start opens the calibration.
+- Start menu → **GazeFocus**. A two-tile icon appears in the tray (it may be under the ^ overflow arrow). Quit from the tray.
 
 ### Using it
 - **Calibrate:** the tray's Recalibrate, the dock's panel, or a click on the dock while it shows "!".
