@@ -1,7 +1,10 @@
 [project]
 name = "gazefocus"
 version = "0.1.0"
-description = "Webcam focus-follows-gaze for a two-monitor Windows desk"
+description = "Webcam focus-follows-gaze for a laptop and one external monitor on Windows"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = "==3.12.*"
 dependencies = [
   "mediapipe==1.0.1",

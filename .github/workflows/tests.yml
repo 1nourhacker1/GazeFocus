@@ -1,0 +1,16 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run python scripts/fetch_model.py
+      - run: uv run --with ruff ruff check
+      - run: uv run pytest -q
