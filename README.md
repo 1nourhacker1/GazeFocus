@@ -4,6 +4,16 @@
 
 A small Liquid Glass status dock sits under the laptop camera. The bigger of its two tiles holds the water: that's where focus is.
 
+![The dock: focus on the laptop, focus on the external monitor, frozen while typing, no face, paused, needs you](docs/images/dock-states.png)
+*The dock, left to right: focus on the laptop · on the external monitor · frozen while you type · no face · paused · needs you.*
+
+<p>
+<img src="docs/images/dock-panel.png" width="400" alt="The hover panel: the live camera preview, the focus, and Pause/Recalibrate">
+<img src="docs/images/calibration-result.png" width="400" alt="The calibration result: a scatter of both screens, the separation, Save and Redo">
+</p>
+
+*Hover the dock for the live preview and the numbers. After a calibration, it shows how well the two screens separate.*
+
 ## What it does
 - **Moves focus to the screen you look at**, to the window you last used on it.
 - **Never fights you:**
@@ -40,6 +50,9 @@ A two-tile icon appears in the tray (it may be under the ^ overflow arrow). Quit
   2. The screens dim, and a green drop tours the external monitor, then the laptop. Follow it with your eyes and turn your head naturally. It waits if it can't see your face.
   3. Beeps mark each step: 1 = the external monitor, 2 = the laptop, 3 = done.
   4. The dock shows the result: the samples, the separation, and the water already following the new calibration. **Save** or **Redo**.
+
+  <img src="docs/images/calibration.png" width="448" alt="Calibrating: the screen dims, a card says Now this screen, and the green drop tours it with a progress ring">
+
   - **Esc** cancels at any point, and so do pausing and locking the screen. The previous calibration is kept.
 - **The dock:**
   - Amber water under a lid means frozen while you type. Steam means no face. Bars mean paused. "!" means something needs you.
@@ -66,6 +79,7 @@ A two-tile icon appears in the tray (it may be under the ^ overflow arrow). Quit
 | `uv run gazefocus dock-demo` | The dock on its own, cycling through every state (no camera) |
 | `uv run gazefocus probe` | A guided measurement of the tracking range and speed on your camera |
 | `uv run gazefocus bench [--minutes 10]` | CPU and RAM use against the budget (≤ 2 % CPU, ≤ 300 MB) |
+| `uv run python scripts/render_screenshots.py` | Re-render these README images from the app's own drawing code (offscreen) |
 
 ## Configuration
 `%APPDATA%\GazeFocus\config.toml` is written with every default on first run, and reloaded live when you save it. Some settings you might change:
