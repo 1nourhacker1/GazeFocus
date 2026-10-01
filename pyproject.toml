@@ -16,6 +16,10 @@ dependencies = [
 [project.scripts]
 gazefocus = "gazefocus.__main__:main"
 
+[project.gui-scripts]
+# .venv\Scripts\gazefocus-app.exe: the background app with no console window (for shortcuts and Startup)
+gazefocus-app = "gazefocus.app.main:gui_main"
+
 [dependency-groups]
 dev = ["pytest==9.1.1"]
 

@@ -155,3 +155,26 @@ def test_run_refuses_a_second_instance(capsys):
     finally:
         holder.close()
     assert "already running" in capsys.readouterr().err
+
+
+def test_a_windowless_launcher_starts_the_app(monkeypatch):
+    """`gazefocus-app.exe` (a uv gui-script: no console window) runs the background app."""
+    import importlib
+    import pathlib
+    import tomllib
+
+    scripts = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["gui-scripts"]
+    module, func = scripts["gazefocus-app"].split(":")
+    entry = getattr(importlib.import_module(module), func)
+    calls = []
+    monkeypatch.setattr("gazefocus.app.main.run_app", lambda **kw: calls.append(kw) or 0)
+    assert entry() == 0 and calls == [{}]
+
+
+def test_without_a_console_the_log_does_not_go_to_stderr(monkeypatch, tmp_path):
+    import logging
+
+    from gazefocus.app.main import log_to_stderr
+
+    monkeypatch.setattr("sys.stderr", None)  # what pythonw gives a windowless app
+    assert log_to_stderr() is False

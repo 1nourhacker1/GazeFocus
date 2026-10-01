@@ -609,6 +609,16 @@ class GazeFocusApp:
                 part.close()
 
 
+def log_to_stderr() -> bool:
+    """A console exists (`gazefocus run`); the windowless launcher (pythonw) has none."""
+    return sys.stderr is not None
+
+
+def gui_main() -> int:
+    """`gazefocus-app.exe`: the background app with no console window."""
+    return run_app()
+
+
 def run_app(seconds: float | None = None) -> int:
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
@@ -630,7 +640,7 @@ def run_app(seconds: float | None = None) -> int:
     cfg_path = app_dir() / "config.toml"
     write_default_config(cfg_path)
     cfg, warnings = load_config(cfg_path)
-    log, dlog = setup_logging(app_dir() / "logs")
+    log, dlog = setup_logging(app_dir() / "logs", to_stderr=log_to_stderr())
     for w in warnings:
         log.warning("config: %s", w)
 
