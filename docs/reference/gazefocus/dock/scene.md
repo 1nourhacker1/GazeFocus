@@ -1,8 +1,8 @@
 # gazefocus/dock/scene.py
-Verified against: GazeFocus@8db716d · 2026-09-30
+Verified against: GazeFocus@b887938 · 2026-10-01
 
 The glyph's state machine: the approved mockup's animations (spec §8.2, §8.3), time-based and pure, in the mockup's viewBox units (88 × 40).
-- Tiles: LG (18, 10, 22, 14) and laptop (48, 14, 22, 14). The focused tile is at 1.18, the other at 0.9, and both at 1.0 when not tracking.
+- Tiles: external monitor (18, 10, 22, 14) and laptop (48, 14, 22, 14). The focused tile is at 1.18, the other at 0.9, and both at 1.0 when not tracking.
 
 **`update(view, now)`** turns a change into animations. The first view appears without animating, and a change of `title`/`detail` only does nothing.
 | Change | Animation |

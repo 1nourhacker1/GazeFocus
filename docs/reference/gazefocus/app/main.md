@@ -1,5 +1,5 @@
 # gazefocus/app/main.py
-Verified against: GazeFocus@971b2ef · 2026-10-01
+Verified against: GazeFocus@b887938 · 2026-10-01
 
 `run_app()`:
 1. DPI awareness.
@@ -22,7 +22,7 @@ Verified against: GazeFocus@971b2ef · 2026-10-01
 **Recalibrate** (Plan 4, spec §9):
 - **Triggers:** the tray, the hover panel's Recalibrate, a click on the collapsed dock while it shows "!" for not calibrated or layout changed (`_on_pill`; otherwise a pill click pauses), and the **first start** without a calibration (`first_run`).
 - **The flow:** every trigger opens the dock's **intro** (`show_intro`); tracking goes on meanwhile.
-  - **Start** (`_start_run`): the fingerprint is recorded, `state.calibrating` is set, and a `calib.run.CalibrationRun` (`run_factory`) starts. It gets the two screens (`qt_screen_rect`, logical, matched by origin; LG and laptop by `zone_monitors`) and the dock's `pill_centre()`.
+  - **Start** (`_start_run`): the fingerprint is recorded, `state.calibrating` is set, and a `calib.run.CalibrationRun` (`run_factory`) starts. It gets the two screens (`qt_screen_rect`, logical, matched by origin; external monitor and laptop by `zone_monitors`) and the dock's `pill_centre()`.
   - The **tracking camera** stays on (or starts) at the full `camera.fps`, and the run samples it. The dock is lifted back above the overlay (`raise_to_top`).
   - Beeps play on a helper thread (`_cue`), because `winsound.Beep` blocks.
   - **Done** (`_run_done`): the dock shows the **result** panel. A saveable result also gets a live **preview**: a `ZoneClassifier` on the new model moves the dock's water, but nothing switches.
@@ -64,3 +64,4 @@ Verified against: GazeFocus@971b2ef · 2026-10-01
 - `_dock_visibility` runs on `apply()` (1 Hz) and on foreground changes: the dock hides while locked, asleep, or under a fullscreen app.
 - `_on_panel` sets the camera preview to 10 fps while the panel is open. A rebuilt dock starts with it off (its panel is closed).
 - A change to any dock setting rebuilds the dock; a `typing_freeze_ms` change alone is pushed with `set_freeze`.
+- **Screen names:** `_name_screens` (in `refresh_layout`) asks `screen_name` (`qt_screen_name`: Qt's screen name, matched by origin) for the external monitor's own name. `display_name` drops empty or "Generic PnP Monitor" names. The result, or "External", goes into `names`, which reaches the dock, the tray, the calibration run (`external_name`) and the result panel.

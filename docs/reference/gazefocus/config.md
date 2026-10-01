@@ -1,12 +1,12 @@
 # gazefocus/config.py
-Verified against: GazeFocus@beaa5d8 · 2026-09-30
+Verified against: GazeFocus@b887938 · 2026-10-01
 
 The file is `%APPDATA%\GazeFocus\config.toml`; the CLI writes the defaults on first run via `write_default_config`.
 
 | Section | Keys (defaults) | Valid range |
 |---|---|---|
 | `decider` | `dwell_ms` 500, `typing_freeze_ms` 1500, `manual_cooldown_ms` 1000, `post_switch_cooldown_ms` 400, `cursor_idle_warp_ms` 2000 | integers 0..60000 |
-| `classifier` | `ema_alpha` 0.35, `dead_band` 0.25, `face_lost_lg_margin` −1.2, `face_lost_memory_s` 0.3, `ood_sigma` 3.5 | (0,1], 0..0.99, −5..0, 0..5, 1..20 |
+| `classifier` | `ema_alpha` 0.35, `dead_band` 0.25, `face_lost_external_margin` −1.2, `face_lost_memory_s` 0.3, `ood_sigma` 3.5 | (0,1], 0..0.99, −5..0, 0..5, 1..20 |
 | `camera` | `index` 0, `width` 640, `height` 480, `fps` 15, `idle_fps` 5, `idle_after_s` 120, `battery_fps` 10 | see `RULES` |
 | `dock` | `enabled` true, `monitor` "primary", `scale` 2.625 (a 115.5 × 52.5 pill; the user's 1.5×), `refraction` true | true/false, non-empty text, 0.5..4, true/false |
 | `hotkey` | `pause` "Ctrl+Alt+G" | non-empty text |
@@ -17,3 +17,4 @@ The file is `%APPDATA%\GazeFocus\config.toml`; the CLI writes the defaults on fi
 - An unreadable file (OSError) gives all defaults plus one warning.
 
 Booleans are written as TOML `true`/`false`; anything else warns and keeps the default.
+- `RENAMED`: old key names still accepted without a warning; `[classifier] face_lost_lg_margin` is now `face_lost_external_margin`.
